@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<script>
+(function(){var box;function show(m){if(!box){box=document.createElement('div');box.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#B42318;color:#fff;font:12px/1.4 monospace;padding:10px 12px;border-radius:12px;max-height:40vh;overflow:auto;white-space:pre-wrap';box.onclick=function(){box.style.display='none'};var add=function(){document.body.appendChild(box)};document.body?add():addEventListener('DOMContentLoaded',add)}box.style.display='block';box.textContent+=m+'\n\n(chạm để ẩn)\n\n'}
+window.__showErr=show;
+addEventListener('error',function(e){if(e.target&&e.target.src)show('Không tải được: '+e.target.src);else show('Lỗi: '+e.message+' ('+(e.filename||'').split('/').pop()+':'+e.lineno+')')},true);
+addEventListener('unhandledrejection',function(e){show('Lỗi: '+(e.reason&&e.reason.message||e.reason))});
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>UBGO - Tài xế</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root { --primary:#0A8F5B; --success:#00C853; --danger:#FF3D00; --warning:#FFA000; --text:#1A1A1A; --text-sec:#8A8A8E; --bg:#F2F3F5; --card:#FFF; --border:#E5E5EA; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); height:100vh; overflow:hidden; display:flex; flex-direction:column; color:var(--text); }
+  
+  /* LOGIN */
+  #loginView { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; padding:20px; background:linear-gradient(135deg, #0A8F5B, #056B43); }
+  .login-box { background:var(--card); padding:30px 24px; border-radius:20px; width:100%; max-width:360px; box-shadow:0 10px 30px rgba(0,0,0,0.2); text-align:center; }
+  .login-box img { width:80px; height:80px; border-radius:20px; object-fit:cover; margin-bottom:16px; }
+  .login-box h1 { font-size:22px; margin-bottom:8px; font-weight:800; }
+  .login-box p { font-size:13px; color:var(--text-sec); margin-bottom:20px; }
+  .login-box input { width:100%; padding:14px; border:2px solid var(--border); border-radius:12px; font-size:15px; margin-bottom:12px; outline:none; text-align:center; }
+  .login-box input:focus { border-color:var(--primary); }
+  .login-box button { width:100%; padding:14px; background:var(--primary); color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; }
+
+  /* MAIN APP */
+  #appView { display:none; flex-direction:column; height:100vh; }
+  .status-bar { height:44px; background:var(--primary); display:flex; align-items:center; justify-content:space-between; padding:0 20px; font-size:12px; font-weight:600; color:#fff; flex-shrink:0; }
+  .app-header { background:var(--primary); padding:8px 20px 20px; display:flex; align-items:center; gap:14px; color:#fff; flex-shrink:0; border-radius:0 0 24px 24px; box-shadow:0 4px 20px rgba(10,108,255,0.2); }
+  .app-header .avatar-wrap { position:relative; }
+  .app-header .avatar { width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; border:2px solid rgba(255,255,255,0.5); overflow:hidden; }
+  .app-header .avatar img { width:100%; height:100%; object-fit:cover; }
+  .app-header .online-indicator { position:absolute; bottom:0; right:0; width:12px; height:12px; border-radius:50%; background:#8A8A8E; border:2px solid var(--primary); transition:background 0.3s; }
+  .app-header .online-indicator.on { background:var(--success); box-shadow:0 0 8px rgba(0,200,83,0.6); }
+  .app-header .user-info { flex:1; }
+  .app-header .user-info h3 { font-size:16px; font-weight:700; margin-bottom:2px; }
+  .app-header .user-info p { font-size:11px; opacity:0.85; }
+  .toggle-online { display:flex; align-items:center; gap:8px; }
+  .toggle-online .status-text { font-size:12px; font-weight:700; }
+  .switch { position:relative; width:54px; height:30px; background:rgba(255,255,255,0.3); border-radius:15px; cursor:pointer; transition:background 0.3s; }
+  .switch.on { background:var(--success); }
+  .switch::after { content:''; position:absolute; top:3px; left:3px; width:24px; height:24px; background:#fff; border-radius:50%; transition:transform 0.3s; box-shadow:0 2px 4px rgba(0,0,0,0.2); }
+  .switch.on::after { transform:translateX(24px); }
+  
+  .main-content { flex:1; overflow-y:auto; position:relative; }
+  .tab-page { display:none; padding-bottom:90px; animation:fadeIn 0.25s ease; }
+  .tab-page.active { display:block; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  
+  .stats { background:var(--card); margin:16px; border-radius:16px; padding:16px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+  .stat { text-align:center; padding:8px 4px; }
+  .stat:not(:last-child) { border-right:1px solid var(--border); }
+  .stat .value { font-size:18px; font-weight:800; color:var(--primary); }
+  .stat .label { font-size:10px; color:var(--text-sec); margin-top:4px; font-weight:600; text-transform:uppercase; }
+  
+  #map { height:280px; margin:0 16px; border-radius:16px; z-index:1; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+  .bottom-panel { background:var(--card); border-radius:24px 24px 0 0; padding:20px 20px 24px; box-shadow:0 -4px 24px rgba(0,0,0,0.08); margin:-16px 0 0; position:relative; z-index:2; min-height:200px; }
+  .bottom-panel .handle { width:40px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 16px; }
+  .bottom-panel h2 { font-size:17px; margin-bottom:14px; font-weight:700; }
+  
+  .order-card { background:#FAFBFC; border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:12px; }
+  .order-card .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .order-card .price { font-size:20px; font-weight:800; color:var(--primary); }
+  .order-card .dist { font-size:12px; color:var(--text-sec); background:#E3F5EC; padding:4px 10px; border-radius:20px; font-weight:600; }
+  .order-card .route { display:flex; flex-direction:column; gap:10px; }
+  .order-card .route .row { display:flex; align-items:start; gap:10px; font-size:13px; color:var(--text); line-height:1.4; }
+  .order-card .route .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+  .order-card .route .dot.green { background:var(--success); }
+  .order-card .route .dot.red { background:var(--danger); }
+  
+  .order-actions { display:flex; gap:10px; margin-top:16px; }
+  .btn-accept { flex:1; padding:14px; background:var(--success); color:#fff; border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; }
+  .btn-reject { flex:1; padding:14px; background:var(--bg); color:var(--text-sec); border:none; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer; }
+  .btn-ghost { width:100%; padding:14px; background:#E3F5EC; color:var(--primary); border:none; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; margin-top:8px; }
+  
+  .empty-state { text-align:center; padding:40px 20px; color:var(--text-sec); }
+  .empty-state .icon { font-size:48px; margin-bottom:14px; opacity:0.4; }
+  .empty-state p { font-size:14px; }
+  
+  .tab-bar { height:72px; background:var(--card); display:flex; border-top:1px solid var(--border); flex-shrink:0; padding-bottom:env(safe-area-inset-bottom); }
+  .tab-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; color:var(--text-sec); font-size:10px; gap:4px; font-weight:600; position:relative; }
+  .tab-item.active { color:var(--primary); }
+  .tab-item .icon { font-size:22px; }
+  .tab-item .badge { position:absolute; top:8px; right:calc(50% - 18px); background:var(--danger); color:#fff; font-size:9px; padding:2px 6px; border-radius:10px; font-weight:700; min-width:18px; text-align:center; }
+  
+  .section { padding:16px; }
+  .section-title { font-size:15px; font-weight:800; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  
+  .list-item { background:var(--card); border-radius:14px; padding:16px; margin-bottom:10px; display:flex; align-items:center; gap:14px; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+  .list-item .icon-box { width:44px; height:44px; border-radius:12px; background:#E3F5EC; color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:20px; }
+  .list-item .icon-box.success { background:#E8F5E9; color:var(--success); }
+  .list-item .icon-box.danger { background:#FFEBEE; color:var(--danger); }
+  .list-item .info { flex:1; min-width:0; }
+  .list-item .info .title { font-size:14px; font-weight:700; margin-bottom:4px; }
+  .list-item .info .subtitle { font-size:11px; color:var(--text-sec); }
+  .list-item .value { font-size:14px; font-weight:800; color:var(--success); white-space:nowrap; }
+  .list-item .value.danger { color:var(--danger); }
+  
+  .wallet-card { background:linear-gradient(135deg,var(--primary),#34C38A); border-radius:16px; padding:24px; color:#fff; margin-bottom:16px; box-shadow:0 4px 20px rgba(10,108,255,0.3); }
+  .wallet-card .label { font-size:12px; opacity:0.85; font-weight:600; margin-bottom:6px; }
+  .wallet-card .balance { font-size:32px; font-weight:800; margin-bottom:20px; }
+  .wallet-card .btn-withdraw { width:100%; padding:14px; background:#fff; color:var(--primary); border:none; border-radius:12px; font-size:14px; font-weight:800; cursor:pointer; }
+  
+  .chat-list-item { background:var(--card); border-radius:14px; padding:14px; margin-bottom:10px; display:flex; align-items:center; gap:14px; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+  .chat-list-item .avatar { width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg,var(--primary),#34C38A); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; }
+  .chat-list-item .info { flex:1; min-width:0; }
+  .chat-list-item .info .name { font-size:14px; font-weight:700; margin-bottom:4px; }
+  .chat-list-item .info .msg { font-size:12px; color:var(--text-sec); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .chat-list-item .meta { text-align:right; }
+  .chat-list-item .meta .time { font-size:10px; color:var(--text-sec); }
+  .chat-list-item .meta .unread { background:var(--danger); color:#fff; font-size:10px; padding:2px 7px; border-radius:10px; margin-top:6px; display:inline-block; font-weight:700; }
+  
+  .chat-window { position:fixed; inset:0; background:var(--bg); z-index:1000; display:none; flex-direction:column; }
+  .chat-window.active { display:flex; }
+  .chat-header { height:64px; background:var(--primary); color:#fff; display:flex; align-items:center; padding:0 16px; gap:14px; }
+  .chat-header .back { font-size:22px; cursor:pointer; }
+  .chat-header .name { flex:1; font-size:16px; font-weight:700; }
+  .chat-messages { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:10px; background:linear-gradient(180deg,#F2F3F5 0%,#E8ECF2 100%); }
+  .msg-bubble { max-width:75%; padding:12px 16px; border-radius:18px; font-size:14px; line-height:1.4; word-wrap:break-word; box-shadow:0 1px 2px rgba(0,0,0,0.06); }
+  .msg-bubble.incoming { background:var(--card); align-self:flex-start; border-bottom-left-radius:6px; }
+  .msg-bubble.outgoing { background:var(--primary); color:#fff; align-self:flex-end; border-bottom-right-radius:6px; }
+  .msg-time { font-size:10px; color:var(--text-sec); margin-top:6px; }
+  .msg-bubble.outgoing .msg-time { color:rgba(255,255,255,0.7); }
+  .chat-input-bar { padding:12px 16px; background:var(--card); display:flex; gap:10px; align-items:center; border-top:1px solid var(--border); }
+  .chat-input-bar input { flex:1; padding:14px 18px; border:none; background:var(--bg); border-radius:24px; outline:none; font-size:14px; }
+  .chat-input-bar .send { width:44px; height:44px; border-radius:50%; background:var(--primary); color:#fff; border:none; font-size:18px; cursor:pointer; }
+  
+  .profile-card { background:var(--card); border-radius:16px; padding:28px 20px; text-align:center; margin-bottom:16px; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+  .profile-card .avatar { width:88px; height:88px; border-radius:50%; background:linear-gradient(135deg,var(--primary),#34C38A); color:#fff; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:800; margin:0 auto 14px; overflow:hidden; }
+  .profile-card .avatar img { width:100%; height:100%; object-fit:cover; }
+  .profile-card h2 { font-size:20px; margin-bottom:6px; font-weight:800; }
+  .profile-card .vehicle { font-size:13px; color:var(--text-sec); margin-bottom:10px; font-weight:600; }
+  .profile-card .rating { display:inline-block; background:#FFF8E1; color:#FF8F00; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:700; }
+  
+  .menu-item { background:var(--card); border-radius:14px; padding:16px; margin-bottom:8px; display:flex; align-items:center; gap:14px; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+  .menu-item .icon { font-size:22px; width:32px; text-align:center; }
+  .menu-item .label { flex:1; font-size:14px; font-weight:600; }
+  .menu-item .arrow { color:var(--text-sec); font-size:18px; }
+  
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; display:none; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.active { display:flex; }
+  .modal { background:var(--card); border-radius:20px; padding:28px 24px; width:100%; max-width:320px; text-align:center; }
+  .modal h3 { font-size:17px; margin-bottom:10px; font-weight:800; }
+  .modal p { font-size:13px; color:var(--text-sec); margin-bottom:22px; }
+  .modal .input-amount { width:100%; padding:14px; border:2px solid var(--border); border-radius:12px; font-size:18px; font-weight:700; text-align:center; margin-bottom:16px; outline:none; }
+  .modal .input-amount:focus { border-color:var(--primary); }
+  .modal .row { display:flex; gap:10px; }
+  .modal .btn { flex:1; padding:14px; border-radius:12px; border:none; font-size:14px; font-weight:700; cursor:pointer; }
+  .modal .btn-cancel { background:var(--bg); color:var(--text-sec); }
+  .modal .btn-confirm { background:var(--primary); color:#fff; }
+  
+  .toast { position:fixed; top:70px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.88); color:#fff; padding:12px 22px; border-radius:24px; font-size:13px; opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:9999; font-weight:600; }
+  .toast.show { opacity:1; }
+
+/* ===== UBGO theme v2 (thống nhất 3 app) ===== */
+:root{--primary:#0A8F5B;--success:#12B76A;--danger:#E5484D;--warning:#F59E0B;--text:#10231A;--text-sec:#6B7D74;--bg:#F3F6F4;--border:#E3EAE6;--ink:#0B1F17}
+*{font-family:'Be Vietnam Pro',-apple-system,'Segoe UI',Roboto,sans-serif!important}
+body{background:var(--bg)}
+.status-bar{background:var(--ink)!important;font-size:11px}
+.app-header{background:linear-gradient(160deg,#0B9D63,#066B43)!important;border-radius:0 0 28px 28px!important;box-shadow:0 10px 24px rgba(6,107,67,.25)}
+#loginView,#authView{background:radial-gradient(120% 80% at 20% 0%,#12B76A 0%,#066B43 55%,#0B1F17 100%)!important}
+.login-box,.auth-box{border-radius:28px!important;box-shadow:0 24px 60px rgba(0,0,0,.35)!important}
+.login-box button,.auth-box button,.btn-accept,.modal .btn-confirm,.btn.btn-primary{background:linear-gradient(135deg,#12B76A,#0A8F5B)!important;box-shadow:0 6px 16px rgba(10,143,91,.3)}
+.btn-reject{background:#EDF1EF!important}
+.card,.list-item,.stats,.profile-card,.menu-item,.chat-list-item{border-radius:20px!important;box-shadow:0 1px 2px rgba(11,31,23,.04),0 8px 24px rgba(11,31,23,.05)!important;border:none!important}
+.tab-bar{margin:0 12px calc(10px + env(safe-area-inset-bottom));border-radius:24px;height:66px!important;border:none!important;box-shadow:0 10px 32px rgba(11,31,23,.16);padding-bottom:0!important}
+.tab-item{position:relative;transition:color .2s}
+.tab-item.active::before{content:'';position:absolute;top:0;width:26px;height:3px;border-radius:0 0 4px 4px;background:var(--primary)}
+.tab-item.active .icon{transform:translateY(-2px) scale(1.08)}
+.bottom-panel{border-radius:28px 28px 0 0!important}
+.order-card{border-radius:20px!important;background:#fff!important;border:1px solid var(--border)!important}
+.order-card .price{font-size:26px!important;letter-spacing:-.5px}
+.wallet-card{background:linear-gradient(135deg,#0B9D63,#055C39)!important;border-radius:24px!important;box-shadow:0 14px 30px rgba(6,107,67,.3)!important}
+.wallet-card .btn-withdraw{color:#066B43!important}
+.stat .value{font-size:19px!important}
+.msg-bubble{border-radius:20px!important}
+.chat-messages{background:#E9F0EC!important}
+.toast{border-radius:16px!important;background:var(--ink)!important}
+/* thanh đếm ngược nhận đơn */
+.offer-timer{height:6px;border-radius:6px;background:#E3EAE6;overflow:hidden;margin-top:12px}
+.offer-timer i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#F59E0B,#E5484D);transition:width .1s linear}
+/* công cụ chuyến đi */
+.tool-row{display:flex;gap:8px;margin-top:10px}
+.tool-btn{flex:1;text-align:center;padding:11px 6px;border-radius:14px;background:#E3F5EC;color:#066B43;font-size:12px;font-weight:700;text-decoration:none;border:none;cursor:pointer}
+.quick-replies{display:flex;gap:8px;overflow-x:auto;padding:8px 14px;background:var(--card);border-top:1px solid var(--border)}
+.quick-replies button{flex-shrink:0;border:1px solid var(--border);background:#fff;border-radius:18px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer}
+/* biểu đồ 7 ngày */
+.week-chart{background:var(--card);border-radius:20px;padding:16px;margin-bottom:16px;box-shadow:0 8px 24px rgba(11,31,23,.05)}
+.wk-head{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--text-sec);font-weight:600}.wk-head b{font-size:18px;color:var(--text)}
+.wk-bars{display:flex;gap:8px;align-items:flex-end;height:96px;margin-top:14px}
+.wk-col{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;font-size:10px;color:var(--text-sec);font-weight:600}
+.wk-bar{width:100%;border-radius:8px 8px 4px 4px;background:#BFE8D3}.wk-bar.today{background:var(--primary)}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.mini{background:var(--card);border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(11,31,23,.05)}.mini b{display:block;font-size:22px}.mini span{font-size:11px;color:var(--text-sec);font-weight:600}
+/* đánh giá sao + gọi tài xế */
+.star-row{display:flex;justify-content:center;gap:6px;font-size:38px;margin:6px 0 14px}
+.star-row span{color:#D5DDD9;cursor:pointer}.star-row span.on{color:#FFB400}
+.call-btn{width:42px;height:42px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:18px;margin-left:auto}
+.dl-box{background:#EAF7F0;border-radius:14px;padding:10px 12px;font-size:12px;line-height:1.7;margin-top:10px}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginView">
+  <div class="login-box">
+    <img src="https://i.ibb.co/DPbGZ7NG/logo.png" onerror="this.style.display='none'">
+    <h1>UBGO Tài xế</h1>
+    <p>Đăng nhập bằng tài khoản Admin cấp</p>
+    <input id="drvUser" placeholder="Tên đăng nhập" autocomplete="off">
+    <input id="drvPass" type="password" placeholder="Mật khẩu" autocomplete="off">
+    <button onclick="doDriverLogin()">Đăng nhập</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appView">
+  <div class="status-bar"><span id="clock">--:--</span><span id="netStatus">…</span></div>
+  <div class="app-header">
+    <div class="avatar-wrap"><div class="avatar" id="headerAvatar">T</div><div class="online-indicator" id="onlineIndicator"></div></div>
+    <div class="user-info"><h3 id="headerName">Tài xế</h3><p id="headerSub">--</p></div>
+    <div class="toggle-online"><span class="status-text" id="onlineText">Offline</span><div class="switch" id="switchOnline"></div></div>
+  </div>
+
+  <div class="main-content">
+    <!-- HOME -->
+    <div class="tab-page active" id="page-home">
+      <div class="stats">
+        <div class="stat"><div class="value" id="todayTrips">0</div><div class="label">Chuyến</div></div>
+        <div class="stat"><div class="value" id="todayEarn">0đ</div><div class="label">Thu nhập</div></div>
+        <div class="stat"><div class="value" id="onlineTime">0h</div><div class="label">Online</div></div>
+      </div>
+      <div id="map"></div>
+      <div class="bottom-panel">
+        <div class="handle"></div>
+        <div id="panelContent"><div class="empty-state"><div class="icon">🛵</div><p>Bật Online để nhận đơn</p></div></div>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="tab-page" id="page-orders">
+      <div class="section"><div class="section-title">📋 Đơn hàng của bạn</div><div id="ordersList"></div></div>
+    </div>
+
+    <!-- INCOME -->
+    <div class="tab-page" id="page-income">
+      <div class="section">
+        <div class="wallet-card">
+          <div class="label">Số dư ví</div>
+          <div class="balance" id="walletBalance">0đ</div>
+          <div id="codLine" style="font-size:12px;font-weight:600;margin:-12px 0 16px;opacity:.95"></div>
+          <button class="btn-withdraw" onclick="openWithdrawModal()">Rút tiền</button>
+        </div>
+        <div class="week-chart" id="weekChart"></div>
+        <div class="section-title">🎉 Sự kiện thưởng</div>
+        <div id="eventList"></div>
+        <div class="section-title" style="margin-top:20px;">💵 Lịch sử giao dịch</div>
+        <div id="incomeList"></div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="tab-page" id="page-chat">
+      <div class="section"><div class="section-title">💬 Tin nhắn</div><div id="chatList"></div></div>
+    </div>
+
+    <!-- ACCOUNT -->
+    <div class="tab-page" id="page-account">
+      <div class="section">
+        <div class="profile-card">
+          <div class="avatar" id="profileAvatar">T</div>
+          <h2 id="profileName">--</h2>
+          <div class="vehicle" id="profileVehicle">--</div>
+          <div class="rating" id="profileRating">⭐ 5.0</div>
+        </div>
+        <div class="menu-item"><span class="icon">👤</span><span class="label">Thông tin cá nhân</span><span class="arrow">›</span></div>
+        <div class="menu-item"><span class="icon">🚗</span><span class="label">Phương tiện</span><span class="arrow">›</span></div>
+        <div class="menu-item"><span class="icon">🏦</span><span class="label">Tài khoản ngân hàng</span><span class="arrow">›</span></div>
+        <a class="menu-item" id="supportLink" href="#" style="text-decoration:none;color:inherit"><span class="icon">🎧</span><span class="label">Hỗ trợ tài xế</span><span class="arrow">›</span></a>
+        <a class="menu-item" href="tel:113" style="text-decoration:none;color:inherit"><span class="icon">🆘</span><span class="label">Khẩn cấp (113)</span><span class="arrow">›</span></a>
+        <div class="menu-item" style="color:var(--danger);" onclick="doDriverLogout()"><span class="icon">🚪</span><span class="label" style="color:var(--danger);">Đăng xuất</span><span class="arrow">›</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item active" data-tab="home" onclick="switchTab('home')"><div class="icon">🏠</div><div>Trang chủ</div></div>
+    <div class="tab-item" data-tab="orders" onclick="switchTab('orders')"><div class="icon">📋</div><div>Đơn hàng</div></div>
+    <div class="tab-item" data-tab="income" onclick="switchTab('income')"><div class="icon">💰</div><div>Thu nhập</div></div>
+    <div class="tab-item" data-tab="chat" onclick="switchTab('chat')"><div class="icon">💬</div><div>Tin nhắn</div><div class="badge" id="chatBadge" style="display:none;">0</div></div>
+    <div class="tab-item" data-tab="account" onclick="switchTab('account')"><div class="icon">👤</div><div>Tài khoản</div></div>
+  </div>
+</div>
+
+<!-- CHAT WINDOW -->
+<div class="chat-window" id="chatWindow">
+  <div class="chat-header"><div class="back" onclick="closeChat()">←</div><div class="name" id="chatName">Khách hàng</div></div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="quick-replies"><button onclick="quickReply('Mình đang trên đường tới ạ')">Đang trên đường</button><button onclick="quickReply('Mình đã tới điểm đón rồi ạ')">Đã tới điểm đón</button><button onclick="quickReply('Bạn ra điểm đón giúp mình nhé')">Bạn ra giúp mình</button><button onclick="quickReply('Mình sẽ tới trễ vài phút, xin lỗi bạn')">Tới trễ chút</button><button onclick="quickReply('Cảm ơn bạn!')">Cảm ơn</button></div>
+  <div class="chat-input-bar"><input id="chatInput" placeholder="Nhập tin nhắn..." onkeypress="if(event.key==='Enter')sendMessage()"><button class="send" onclick="sendMessage()">➤</button></div>
+</div>
+
+<!-- WITHDRAW MODAL -->
+<div class="modal-overlay" id="withdrawModal">
+  <div class="modal">
+    <h3>Rút tiền</h3>
+    <p>Số dư: <b id="modalBalance">0đ</b></p>
+    <input type="number" class="input-amount" id="withdrawAmount" placeholder="Nhập số tiền...">
+    <div class="row"><button class="btn btn-cancel" onclick="closeWithdrawModal()">Hủy</button><button class="btn btn-confirm" onclick="confirmWithdraw()">Xác nhận</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ==========================================
+// UBGO CORE — Firebase Realtime DB (dùng chung cho cả 3 app: adm / khachh / taix)
+// Giữ nguyên API cũ: DB() đọc đồng bộ từ cache realtime, DBSave() chỉ ghi phần thay đổi.
+// ==========================================
+const FIREBASE_URL = 'https://uongbigo-default-rtdb.asia-southeast1.firebasedatabase.app';
+const COLLS = ['users','drivers','orders','vouchers','events','topups','withdraws','transactions'];
+const DELTA = new Set(['balance','totalTrips','totalSpent']); // số liệu cộng/trừ → ghi bằng increment để không bị ghi đè
+const DEFAULT_CONFIG = {
+  bank: { bankId:'vietcombank', account:'1339466041', owner:'PHAM TRAN THIEN KHAI', zalo:'0339466041', zaloUrl:'https://zalo.me/0339466041' },
+  logo: 'https://i.ibb.co/DPbGZ7NG/logo.png',
+  vipThreshold: 1000000, minWithdraw: 10000, copyright: 'Thiên Khải',
+  pricing: { surgeOn: true, surgeMul: 1.2, peak: [[11, 13], [17, 19]], peakBonus: 5000, vehicles: { moto: 1, van: 2.2, truck: 3.5 } }
+};
+
+firebase.initializeApp({ databaseURL: FIREBASE_URL });
+const rootRef = firebase.database().ref();
+const inc = n => firebase.database.ServerValue.increment(n);
+
+let remote = {}, cache = emptyCache(), base = clone(cache), synced = false;
+const listeners = [];
+function emptyCache() { const c = { chats: {}, config: clone(DEFAULT_CONFIG) }; COLLS.forEach(k => c[k] = []); return c; }
+function clone(x) { return JSON.parse(JSON.stringify(x)); }
+function ss(v) { // stringify ổn định (sắp xếp key) để so sánh
+  if (v === undefined) return 'u';
+  if (v && typeof v === 'object') return Array.isArray(v) ? '[' + v.map(ss).join(',') + ']' : '{' + Object.keys(v).sort().map(k => k + ':' + ss(v[k])).join(',') + '}';
+  return JSON.stringify(v);
+}
+function toList(x) { if (x == null) return []; if (Array.isArray(x)) return x; return Object.keys(x).sort((a, b) => a - b).map(k => x[k]); }
+function normItem(c, k, v) {
+  const o = { ...v, id: k };
+  if (c === 'users') { o.addresses = toList(o.addresses); o.vouchersUsed = toList(o.vouchersUsed); }
+  if (c === 'orders' && o.routeGeometry) o.routeGeometry = toList(o.routeGeometry).map(toList);
+  return o;
+}
+function rebuild() {
+  COLLS.forEach(c => {
+    cache[c] = Object.entries(remote[c] || {}).filter(([, v]) => v && typeof v === 'object')
+      .map(([k, v]) => normItem(c, k, v)).sort((a, b) => (a.createdAt || a.time || 0) - (b.createdAt || b.time || 0));
+  });
+  cache.chats = {};
+  Object.entries(remote.chats || {}).forEach(([oid, msgs]) => {
+    cache.chats[oid] = Object.entries(msgs || {}).map(([k, m]) => ({ ...m, id: k })).sort((a, b) => (a.time || 0) - (b.time || 0));
+  });
+  const rc = remote.config || {};
+  cache.config = { ...DEFAULT_CONFIG, ...rc, bank: { ...DEFAULT_CONFIG.bank, ...(rc.bank || {}) },
+    pricing: { ...DEFAULT_CONFIG.pricing, ...(rc.pricing || {}), vehicles: { ...DEFAULT_CONFIG.pricing.vehicles, ...((rc.pricing || {}).vehicles || {}) } } };
+  base = clone(cache);
+}
+
+// ---- Đọc / ghi ----
+function DB() { return cache; }
+function uid(prefix) { return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
+
+function diff(data) {
+  const u = {};
+  COLLS.forEach(c => {
+    const was = new Map((base[c] || []).map(x => [x.id, x]));
+    const now = new Map();
+    (data[c] || []).forEach(x => { if (!x.id) x.id = uid(c[0].toUpperCase()); now.set(x.id, x); });
+    now.forEach((item, id) => {
+      const old = was.get(id);
+      if (!old) { u[`${c}/${id}`] = item; return; }
+      new Set([...Object.keys(old), ...Object.keys(item)]).forEach(k => {
+        if (k === 'id' || ss(old[k]) === ss(item[k])) return;
+        if (DELTA.has(k) && typeof item[k] === 'number' && typeof old[k] === 'number') u[`${c}/${id}/${k}`] = inc(item[k] - old[k]);
+        else u[`${c}/${id}/${k}`] = item[k] === undefined ? null : item[k];
+      });
+    });
+    was.forEach((_, id) => { if (!now.has(id)) u[`${c}/${id}`] = null; });
+  });
+  Object.entries(data.chats || {}).forEach(([oid, msgs]) => {
+    const known = new Set((base.chats[oid] || []).map(m => m.id));
+    msgs.forEach(m => { if (!m.id) m.id = uid('M'); if (!known.has(m.id)) u[`chats/${oid}/${m.id}`] = m; });
+  });
+  Object.keys(data.config || {}).forEach(k => { if (ss(data.config[k]) !== ss(base.config[k])) u[`config/${k}`] = data.config[k]; });
+  return u;
+}
+function DBSave(data) {
+  const u = diff(data || cache);
+  base = clone(data || cache);
+  if (!Object.keys(u).length) return Promise.resolve();
+  return rootRef.update(u).catch(err => { console.error(err); notify('error', err); });
+}
+
+// ---- Giao dịch nguyên tử (chống 2 tài xế nhận cùng 1 đơn, duyệt 2 lần…) ----
+async function claim(path, from, to) {
+  const r = await rootRef.child(path).transaction(cur => cur === from ? to : undefined);
+  return r.committed;
+}
+async function acceptOrder(orderId, driverId) {
+  const o = cache.orders.find(x => x.id === orderId), d = cache.drivers.find(x => x.id === driverId);
+  if (!o || !d) return { ok: false, error: 'Không tìm thấy' };
+  if (!(await claim(`orders/${orderId}/status`, 'pending', 'accepted'))) return { ok: false, error: 'Đơn đã có người nhận hoặc đã bị hủy' };
+  const driver = { id: d.id, name: d.name, vehicle: d.vehicle, plate: d.plate, phone: d.phone, avatar: d.avatar || '' };
+  await rootRef.child(`orders/${orderId}`).update({ driver, acceptedAt: Date.now() });
+  return { ok: true, order: { ...o, status: 'accepted', driver } };
+}
+async function cancelOrder(orderId) { return claim(`orders/${orderId}/status`, 'pending', 'cancelled'); }
+function setOrderStatus(orderId, status, patch = {}) { return rootRef.child(`orders/${orderId}`).update({ status, ...patch }); }
+function confirmOrderTwoWay(orderId, who) { // mỗi bên chỉ ghi cờ của mình; hoàn tất do finalizeDeliveries()
+  return rootRef.child(`orders/${orderId}/${who === 'customer' ? 'customerConfirmed' : 'driverConfirmed'}`).set(true);
+}
+const finalizing = new Set();
+async function finalizeDeliveries() {
+  for (const o of cache.orders) {
+    if (o.status !== 'delivering' || !o.customerConfirmed || !o.driverConfirmed || finalizing.has(o.id)) continue;
+    finalizing.add(o.id);
+    try {
+      if (!(await claim(`orders/${o.id}/status`, 'delivering', 'delivered'))) continue; // máy khác đã chốt
+      const t = Date.now(), up = {};
+      up[`orders/${o.id}/deliveredAt`] = t;
+      if (o.driver) {
+        const tx = uid('TX');
+        const bonus = o.surge ? (cache.config.pricing.peakBonus || 0) : 0;
+        up[`drivers/${o.driver.id}/balance`] = inc(o.price + bonus);
+        if (bonus) { const bt = uid('TX'); up[`transactions/${bt}`] = { id: bt, type: 'bonus', driverId: o.driver.id, amount: bonus, orderId: o.id, time: t, createdAt: t }; }
+        if (o.delivery && o.delivery.cod) up[`drivers/${o.driver.id}/codHolding`] = inc(o.delivery.cod);
+        up[`drivers/${o.driver.id}/totalTrips`] = inc(1);
+        up[`transactions/${tx}`] = { id: tx, type: 'earn', driverId: o.driver.id, amount: o.price, orderId: o.id, time: t, createdAt: t };
+      }
+      if (o.userId) { up[`users/${o.userId}/totalTrips`] = inc(1); up[`users/${o.userId}/totalSpent`] = inc(o.price); }
+      await rootRef.update(up);
+    } catch (e) { console.error(e); finalizing.delete(o.id); }
+  }
+}
+
+// ---- Phiên đăng nhập: lưu riêng từng thiết bị (không dùng chung qua DB) ----
+const Sess = {
+  get: k => { try { return localStorage.getItem('ubgo_sess_' + k) || null; } catch { return null; } },
+  set: (k, v) => { try { v == null ? localStorage.removeItem('ubgo_sess_' + k) : localStorage.setItem('ubgo_sess_' + k, v); } catch {} }
+};
+
+// ---- Sự kiện realtime + trạng thái kết nối ----
+function notify(type, payload) { listeners.forEach(fn => { try { fn(type, payload); } catch (e) { console.error(e); } }); }
+function onDBChange(fn) { listeners.push(fn); }
+let connected = false;
+function paintNet() {
+  const el = document.getElementById('netStatus');
+  if (el) el.innerHTML = connected ? '<span style="color:#7CFFB0">●</span> Đã kết nối' : '<span style="color:#FFB74D">●</span> Đang kết nối...';
+}
+document.addEventListener('DOMContentLoaded', paintNet);
+firebase.database().ref('.info/connected').on('value', s => { connected = !!s.val(); paintNet(); });
+
+let _resolveReady; const dbReady = new Promise(r => _resolveReady = r);
+setTimeout(() => _resolveReady(), 6000); // mạng chậm vẫn mở được app
+rootRef.on('value', snap => {
+  remote = snap.val() || {};
+  if (!synced) { synced = true; if (!remote.config) rootRef.child('config').set(DEFAULT_CONFIG); }
+  rebuild(); _resolveReady();
+  finalizeDeliveries();
+  notify('change');
+}, err => { console.error(err); notify('error', err); _resolveReady(); });
+
+function haversineKm(a, b) {
+  const R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+  const s1 = Math.sin(dLat / 2), s2 = Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(s1 * s1 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * s2 * s2));
+}
+function debounce(fn, ms) { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+function loginDriver(username, password) {
+  const db = DB();
+    const d = db.drivers.find(x => x.username === username && x.password === password);
+  if (!d) return { ok: false, error: 'Sai tài khoản hoặc mật khẩu' };
+  if (d.status !== 'active') return { ok: false, error: 'Tài khoản đã bị khóa' };
+  Sess.set('driver', d.id); bindPresence(d.id);
+  return { ok: true, driver: d };
+}
+function logoutDriver() { const d = currentDriver(); if (d) rootRef.child(`drivers/${d.id}/online`).set(false); Sess.set('driver', null); }
+function bindPresence(id) { const r = rootRef.child(`drivers/${id}/online`); r.onDisconnect().set(false); }
+function currentDriver() { const id = Sess.get('driver'); return id ? DB().drivers.find(d => d.id === id) : null; }
+function updateDriver(id, patch) { const db = DB(); const idx = db.drivers.findIndex(d => d.id === id); if (idx !== -1) { db.drivers[idx] = { ...db.drivers[idx], ...patch }; DBSave(db); return db.drivers[idx]; } return null; }
+
+function getPendingOrders() { const db = DB(); return db ? db.orders.filter(o => o.status === 'pending') : []; }
+function updateOrderStatus(orderId, status, patch = {}) { return setOrderStatus(orderId, status, patch); }
+async function createWithdraw({ driverId, amount }) {
+  const db = DB();
+  const d = db.drivers.find(x => x.id === driverId);
+  if (!d) return { ok: false, error: 'Không tìm thấy' };
+  if (amount < db.config.minWithdraw) return { ok: false, error: 'Tối thiểu ' + db.config.minWithdraw.toLocaleString('vi-VN') + 'đ' };
+  // trừ tiền nguyên tử: chỉ trừ khi số dư (trên server) còn đủ
+  const r = await rootRef.child(`drivers/${driverId}/balance`).transaction(cur => (cur || 0) >= amount ? (cur || 0) - amount : undefined);
+  if (!r.committed) return { ok: false, error: 'Số dư không đủ' };
+  const t = Date.now(), wid = uid('W'), tx = uid('TX');
+  await rootRef.update({
+    [`withdraws/${wid}`]: { id: wid, driverId, amount, status: 'pending', createdAt: t },
+    [`transactions/${tx}`]: { id: tx, type: 'withdraw', driverId, amount, time: t, createdAt: t }
+  });
+  return { ok: true };
+}
+function getChatsForOrder(orderId) { return DB().chats[orderId] || []; }
+function sendChat(orderId, sender, text, name) {
+  const db = DB();
+  if (!db.chats[orderId]) db.chats[orderId] = [];
+  db.chats[orderId].push({ sender, text, name, time: Date.now() });
+  DBSave(db);
+}
+
+// ==========================================
+// UI LOGIC
+// ==========================================
+const UONG_BI = [20.9435, 106.7898];
+const map = L.map('map', { zoomControl:false }).setView(UONG_BI, 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OSM' }).addTo(map);
+let routeLine = null, pickupMarker = null, destMarker = null, driverMarker = null;
+
+let online = false, currentOrderId = null, offeredOrderId = null, offerTimer = null;
+const OFFER_SECONDS = 20;
+let stats = { trips: 0, earn: 0, onlineMin: 0 };
+let shownOrderIds = new Set(), unreadChats = {}, activeChatOrderId = null;
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function updateClock(){const n=new Date();document.getElementById('clock').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
+updateClock(); setInterval(updateClock, 30000);
+
+function doDriverLogin() {
+  const u = document.getElementById('drvUser').value.trim();
+  const p = document.getElementById('drvPass').value;
+  const r = loginDriver(u, p);
+  if (!r.ok) { toast(r.error); return; }
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('appView').style.display = 'flex';
+  const d = r.driver;
+  document.getElementById('headerName').textContent = d.name;
+  document.getElementById('headerSub').textContent = d.plate + ' • ' + d.vehicle;
+  document.getElementById('headerAvatar').innerHTML = d.avatar ? `<img src="${d.avatar}">` : d.name[0];
+  renderAccount();
+  renderIncome();
+}
+function doDriverLogout() { logoutDriver(); location.reload(); }
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab-item[data-tab="${tab}"]`).classList.add('active');
+  if (tab === 'orders') renderOrders();
+  if (tab === 'income') renderIncome();
+  if (tab === 'chat') renderChatList();
+  if (tab === 'account') renderAccount();
+  setTimeout(() => map.invalidateSize(), 100);
+}
+
+document.getElementById('switchOnline').addEventListener('click', function () {
+  online = !online;
+  this.classList.toggle('on', online);
+  document.getElementById('onlineText').textContent = online ? 'Online' : 'Offline';
+  document.getElementById('onlineIndicator').classList.toggle('on', online);
+  const d = currentDriver();
+  if (d) updateDriver(d.id, { online });
+  if (online) {
+    toast('Đã bật Online');
+    document.getElementById('panelContent').innerHTML = '<div class="empty-state"><div class="icon">📡</div><p>Đang tìm đơn gần bạn...</p></div>';
+    checkPendingOrders();
+  } else {
+    toast('Đã tắt Online');
+    document.getElementById('panelContent').innerHTML = '<div class="empty-state"><div class="icon">🛵</div><p>Bật Online để nhận đơn</p></div>';
+  }
+});
+
+function checkPendingOrders() {
+  if (!online || currentOrderId) return;
+  const d = currentDriver();
+  if (!d) return;
+  const orders = getPendingOrders();
+  if (!orders.length) return;
+
+  // ƯU TIÊN TÀI XẾ GẦN: lọc đơn mà tài xế này là người gần nhất (chưa bị người khác nhận)
+  const nearby = orders.map(o => ({
+    order: o,
+    dist: haversineKm(d.location, o.pickup)
+  })).sort((a, b) => a.dist - b.dist);
+
+  const candidate = nearby.find(x => !shownOrderIds.has(x.order.id));
+  if (candidate) {
+    shownOrderIds.add(candidate.order.id);
+    showOrder(candidate.order, candidate.dist);
+  }
+}
+
+function showOrder(order, pickupDist) {
+  offeredOrderId = order.id; startOfferTimer(order.id); beep();
+  document.getElementById('panelContent').innerHTML = `
+    <h2>🔔 Đơn mới gần bạn!</h2>
+    <div class="order-card">
+      <div class="header">
+        <span class="price">${order.price.toLocaleString('vi-VN')}đ</span>
+        <span class="dist">${order.distanceKm.toFixed(1)} km • ${order.durationMin} phút</span>
+      </div>
+      <div style="font-size:12px;color:var(--primary);font-weight:700;margin-bottom:10px;">
+        📍 Cách bạn ${pickupDist.toFixed(1)} km
+      </div>
+      <div class="route">
+        <div class="row"><div class="dot green"></div><span>${order.pickup.name}</span></div>
+        <div class="row"><div class="dot red"></div><span>${order.destination.name}</span></div>
+      </div>
+      ${deliveryInfo(order)}<div class="offer-timer"><i id="offerBar"></i></div>
+      <div class="order-actions">
+        <button class="btn-reject" onclick="rejectOrder('${order.id}')">Từ chối</button>
+        <button class="btn-accept" onclick="acceptOrderUI('${order.id}')">Nhận đơn</button>
+      </div>
+    </div>`;
+  if (routeLine) map.removeLayer(routeLine);
+  if (order.routeGeometry) {
+    routeLine = L.polyline(order.routeGeometry, { color: '#0A8F5B', weight: 5 }).addTo(map);
+    map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
+  }
+  if (pickupMarker) map.removeLayer(pickupMarker);
+  if (destMarker) map.removeLayer(destMarker);
+  pickupMarker = L.marker([order.pickup.lat, order.pickup.lng], { icon: L.divIcon({ className: '', html: '<div style="background:#00C853;width:14px;height:14px;border-radius:50%;border:3px solid #fff;"></div>', iconSize: [14, 14] }) }).addTo(map);
+  destMarker = L.marker([order.destination.lat, order.destination.lng], { icon: L.divIcon({ className: '', html: '<div style="background:#FF3D00;width:14px;height:14px;border-radius:50%;border:3px solid #fff;"></div>', iconSize: [14, 14] }) }).addTo(map);
+}
+
+async function acceptOrderUI(orderId) {
+  const d = currentDriver();
+  const r = await acceptOrder(orderId, d.id);
+  if (!r.ok) { toast(r.error); resetOfferPanel(); return; }
+  offeredOrderId = null; clearInterval(offerTimer);
+  currentOrderId = orderId;
+  toast('Đã nhận đơn');
+  const o = r.order;
+  document.getElementById('panelContent').innerHTML = `
+    <h2>🚀 Đang di chuyển đến điểm đón</h2>
+    <div class="order-card">
+      <div class="route"><div class="row"><div class="dot green"></div><span>${o.pickup.name}</span></div></div>
+    </div>
+    <button class="btn-accept" style="width:100%;margin-top:12px;" onclick="arrivedPickup('${orderId}')">Đã đến điểm đón</button>
+    ${tripTools(o, o.pickup)}`;
+  if (driverMarker) map.removeLayer(driverMarker);
+  driverMarker = L.marker([o.pickup.lat + 0.003, o.pickup.lng + 0.003], { icon: L.divIcon({ className: '', html: '<div style="background:#0A8F5B;width:22px;height:22px;border-radius:50%;border:3px solid #fff;font-size:12px;display:flex;align-items:center;justify-content:center;">🛵</div>', iconSize: [22, 22] }) }).addTo(map);
+}
+
+function arrivedPickup(orderId) {
+  const o = DB().orders.find(x => x.id === orderId);
+  if (!o) return;
+  setOrderStatus(orderId, 'picked_up');
+  document.getElementById('panelContent').innerHTML = `
+    <h2>🎯 Đang di chuyển đến điểm đến</h2>
+    <div class="order-card">
+      <div class="route"><div class="row"><div class="dot red"></div><span>${o.destination.name}</span></div></div>
+    </div>
+    <button class="btn-accept" style="width:100%;margin-top:12px;" onclick="arrivedDestination('${orderId}')">Đã đến điểm đến</button>
+    ${tripTools(o, o.destination)}`;
+  toast('Đã đón khách');
+}
+
+function arrivedDestination(orderId) {
+  const o = DB().orders.find(x => x.id === orderId);
+  if (!o) return;
+  setOrderStatus(orderId, 'delivering');
+  document.getElementById('panelContent').innerHTML = `
+    <h2>📦 Xác nhận giao đơn</h2>
+    <div class="order-card">
+      <div class="route"><div class="row"><div class="dot red"></div><span>${o.destination.name}</span></div></div>
+    </div>
+    ${proofBlock(o)}<button class="btn-accept" style="width:100%;margin-top:12px;" onclick="driverConfirm('${orderId}')">✅ Xác nhận đã giao cho khách</button>`;
+  toast('Chờ khách xác nhận');
+}
+
+async function driverConfirm(orderId) {
+  const ord = DB().orders.find(x => x.id === orderId);
+  if (ord && ord.delivery && !window._proof) { toast('Hãy chụp ảnh giao hàng trước'); return; }
+  if (window._proof) { await rootRef.child(`orders/${orderId}/proofPhoto`).set(window._proof); window._proof = null; }
+  await confirmOrderTwoWay(orderId, 'driver');
+  const o = DB().orders.find(x => x.id === orderId);
+  if (o && o.status === 'delivered') return; // onDBChange sẽ xử lý
+  toast('Đã xác nhận, chờ khách xác nhận');
+  document.getElementById('panelContent').innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>Chờ khách xác nhận...</p></div>';
+}
+function onOrderDelivered(o) {
+  toast('🎉 Giao thành công! +' + o.price.toLocaleString('vi-VN') + 'đ');
+  refreshStats();
+  finishOrderUI();
+}
+
+function finishOrderUI() {
+  currentOrderId = null;
+  [routeLine, pickupMarker, destMarker, driverMarker].forEach(m => { if (m) map.removeLayer(m); });
+  routeLine = pickupMarker = destMarker = driverMarker = null;
+  document.getElementById('panelContent').innerHTML = '<div class="empty-state"><div class="icon">📡</div><p>Đang tìm đơn gần bạn...</p></div>';
+  renderIncome();
+}
+
+function resetOfferPanel() {
+  offeredOrderId = null; clearInterval(offerTimer);
+  document.getElementById('panelContent').innerHTML = online
+    ? '<div class="empty-state"><div class="icon">📡</div><p>Đang tìm đơn gần bạn...</p></div>'
+    : '<div class="empty-state"><div class="icon">🛵</div><p>Bật Online để nhận đơn</p></div>';
+  [routeLine, pickupMarker, destMarker].forEach(m => { if (m) map.removeLayer(m); });
+  routeLine = pickupMarker = destMarker = null;
+}
+function rejectOrder(orderId) {
+  offeredOrderId = null; clearInterval(offerTimer);
+  shownOrderIds.add(orderId);
+  toast('Đã từ chối');
+  document.getElementById('panelContent').innerHTML = '<div class="empty-state"><div class="icon">📡</div><p>Đang tìm đơn...</p></div>';
+}
+
+function renderOrders() {
+  const d = currentDriver();
+  if (!d) return;
+  const db = DB();
+  const orders = db.orders.filter(o => o.driver && o.driver.id === d.id).reverse();
+  const list = document.getElementById('ordersList');
+  if (!orders.length) { list.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>Chưa có đơn</p></div>'; return; }
+  list.innerHTML = orders.map(o => `
+    <div class="list-item">
+      <div class="icon-box ${o.status==='delivered'?'success':o.status==='cancelled'?'danger':''}">${o.status==='delivered'?'✅':o.status==='cancelled'?'❌':'⏳'}</div>
+      <div class="info"><div class="title">${o.pickup.name.split(',')[0]} → ${o.destination.name.split(',')[0]}</div><div class="subtitle">${o.service} • ${o.distanceKm.toFixed(1)} km • ${new Date(o.createdAt).toLocaleString('vi-VN')}</div></div>
+      <div class="value ${o.status==='cancelled'?'danger':''}">${o.price.toLocaleString('vi-VN')}đ</div>
+    </div>`).join('');
+}
+
+function renderIncome() {
+  const d = currentDriver();
+  if (!d) return;
+  document.getElementById('walletBalance').textContent = d.balance.toLocaleString('vi-VN') + 'đ';
+  const db = DB();
+  const events = db.events.filter(e => e.active);
+  const el = document.getElementById('eventList');
+  if (!events.length) el.innerHTML = '<div style="text-align:center;color:var(--text-sec);font-size:13px;padding:16px;">Không có sự kiện</div>';
+  else el.innerHTML = events.map(e => `
+    <div class="list-item">
+      <div class="icon-box" style="background:#FFF3E0;color:var(--warning);">🎉</div>
+      <div class="info"><div class="title">${e.title}</div><div class="subtitle">${e.description || ''}</div></div>
+      <div class="value">+${e.bonus.toLocaleString('vi-VN')}đ</div>
+    </div>`).join('');
+
+  const txs = (db.transactions || []).filter(t => t.driverId === d.id).reverse();
+  const list = document.getElementById('incomeList');
+  if (!txs.length) list.innerHTML = '<div class="empty-state"><div class="icon">💰</div><p>Chưa có giao dịch</p></div>';
+  else list.innerHTML = txs.map(t => `
+    <div class="list-item">
+      <div class="icon-box ${t.type==='withdraw'?'danger':'success'}">${t.type==='withdraw'?'🏦':t.type==='bonus'?'🔥':'💵'}</div>
+      <div class="info"><div class="title">${t.type==='earn'?'Thu nhập chuyến':t.type==='bonus'?'Thưởng giờ cao điểm':'Rút tiền'}</div><div class="subtitle">${new Date(t.time).toLocaleString('vi-VN')}</div></div>
+      <div class="value ${t.type==='withdraw'?'danger':''}">${t.type==='withdraw'?'-':'+'}${t.amount.toLocaleString('vi-VN')}đ</div>
+    </div>`).join('');
+}
+
+function openWithdrawModal() {
+  const d = currentDriver();
+  if (!d) return;
+  document.getElementById('modalBalance').textContent = d.balance.toLocaleString('vi-VN') + 'đ';
+  document.getElementById('withdrawAmount').value = '';
+  document.getElementById('withdrawModal').classList.add('active');
+}
+function closeWithdrawModal() { document.getElementById('withdrawModal').classList.remove('active'); }
+function confirmWithdraw() {
+  const d = currentDriver();
+  const amount = parseInt(document.getElementById('withdrawAmount').value);
+  if (!amount) { toast('Nhập số tiền'); return; }
+  const r = createWithdraw({ driverId: d.id, amount });
+  if (!r.ok) { toast(r.error); return; }
+  toast('Đã gửi yêu cầu rút ' + amount.toLocaleString('vi-VN') + 'đ');
+  closeWithdrawModal();
+  renderIncome();
+}
+
+function renderAccount() {
+  const d = currentDriver();
+  if (!d) return;
+  document.getElementById('profileAvatar').innerHTML = d.avatar ? `<img src="${d.avatar}">` : d.name[0];
+  document.getElementById('profileName').textContent = d.name;
+  document.getElementById('profileVehicle').textContent = d.plate + ' • ' + d.vehicle;
+  document.getElementById('profileRating').textContent = '⭐ ' + drvRating(d).toFixed(1);
+}
+
+function getDriverChats() {
+  const d = currentDriver();
+  if (!d) return {};
+  const db = DB();
+  const result = {};
+  Object.keys(db.chats || {}).forEach(orderId => {
+    const o = db.orders.find(x => x.id === orderId);
+    if (o && o.driver && o.driver.id === d.id) result[orderId] = db.chats[orderId];
+  });
+  return result;
+}
+
+function renderChatList() {
+  const chats = getDriverChats();
+  const entries = Object.entries(chats).filter(([k, v]) => v.length > 0);
+  const list = document.getElementById('chatList');
+  if (!entries.length) { list.innerHTML = '<div class="empty-state"><div class="icon">💬</div><p>Chưa có tin nhắn</p></div>'; return; }
+  list.innerHTML = entries.map(([oid, msgs]) => {
+    const db = DB();
+    const o = db.orders.find(x => x.id === oid);
+    const last = msgs[msgs.length - 1];
+    return `
+      <div class="chat-list-item" onclick="openChatWith('${oid}')">
+        <div class="avatar">${o ? o.customerName[0] : 'K'}</div>
+        <div class="info"><div class="name">${o ? o.customerName : 'Khách'}</div><div class="msg">${last.sender==='driver'?'Bạn: ':''}${last.text}</div></div>
+        <div class="meta"><div class="time">${new Date(last.time).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}</div></div>
+      </div>`;
+  }).join('');
+}
+
+function openChatWith(orderId) {
+  activeChatOrderId = orderId;
+  document.getElementById('chatWindow').classList.add('active');
+  renderMessages();
+}
+function closeChat() { document.getElementById('chatWindow').classList.remove('active'); activeChatOrderId = null; renderChatList(); }
+function renderMessages() {
+  if (!activeChatOrderId) return;
+  const msgs = getChatsForOrder(activeChatOrderId);
+  document.getElementById('chatMessages').innerHTML = msgs.map(m => `
+    <div class="msg-bubble ${m.sender==='driver'?'outgoing':'incoming'}">${m.text}<div class="msg-time">${new Date(m.time).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('');
+  document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+}
+function sendMessage() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text || !activeChatOrderId) return;
+  const d = currentDriver();
+  sendChat(activeChatOrderId, 'driver', text, d.name);
+  inp.value = '';
+  renderMessages();
+}
+
+// Polling
+setInterval(() => {
+  if (online) checkPendingOrders();
+}, 2000);
+setInterval(() => {
+  if (activeChatOrderId) renderMessages();
+}, 2000);
+setInterval(() => {
+  if (online) {
+    stats.onlineMin++;
+    document.getElementById('onlineTime').textContent = Math.floor(stats.onlineMin / 60) + 'h';
+  }
+}, 60000);
+
+// ===== Tính năng thêm =====
+const esc = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function deliveryInfo(o) {
+  const d = o.delivery, surge = o.surge ? '<div class="dl-box" style="background:#FFF1E0;color:#B45309">🔥 Giờ cao điểm: thưởng thêm khi hoàn thành</div>' : '';
+  if (!d) return surge;
+  return `<div class="dl-box">📦 <b>${esc(d.item) || 'Hàng hoá'}</b> • ${{ moto: 'Xe máy', van: 'Van', truck: 'Tải' }[o.vehicle || 'moto']}<br>👤 Nhận: ${esc(d.receiverName)} • ${esc(d.receiverPhone)}${d.cod ? `<br>💵 Thu hộ: <b>${d.cod.toLocaleString('vi-VN')}đ</b>` : ''}${d.tip ? `<br>🎁 Tip: ${d.tip.toLocaleString('vi-VN')}đ` : ''}${d.note ? `<br>📝 ${esc(d.note)}` : ''}</div>` + surge;
+}
+window._proof = null;
+function proofBlock(o) {
+  if (!o.delivery) return '';
+  return `${deliveryInfo(o)}<input type="file" id="proofInput" accept="image/*" capture="environment" style="display:none" onchange="takeProof(this)"><button class="tool-btn" style="width:100%;margin-top:10px" onclick="document.getElementById('proofInput').click()">📷 Chụp ảnh giao hàng</button><img id="proofPrev" style="display:none;width:100%;border-radius:14px;margin-top:10px">${o.delivery.cod ? `<div class="dl-box" style="background:#FFF1E0;color:#B45309">Nhớ thu <b>${o.delivery.cod.toLocaleString('vi-VN')}đ</b> tiền hộ</div>` : ''}`;
+}
+function takeProof(inp) {
+  const f = inp.files[0]; if (!f) return; const img = new Image();
+  img.onload = () => { const c = document.createElement('canvas'), k = Math.min(1, 720 / Math.max(img.width, img.height)); c.width = img.width * k; c.height = img.height * k; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); window._proof = c.toDataURL('image/jpeg', .6); const p = document.getElementById('proofPrev'); p.src = window._proof; p.style.display = 'block'; URL.revokeObjectURL(img.src); };
+  img.src = URL.createObjectURL(f);
+}
+function drvRating(d) { return d.ratingCount ? d.ratingSum / d.ratingCount : (d.rating || 5); }
+function beep() { try { navigator.vibrate && navigator.vibrate([200, 100, 200]); const c = new (window.AudioContext || window.webkitAudioContext)(); [880, 1175].forEach((f, i) => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = f; g.gain.value = .08; o.connect(g); g.connect(c.destination); o.start(c.currentTime + i * .18); o.stop(c.currentTime + i * .18 + .15); }); } catch (e) {} }
+function startOfferTimer(orderId) {
+  clearInterval(offerTimer); const t0 = Date.now();
+  offerTimer = setInterval(() => {
+    const left = OFFER_SECONDS * 1000 - (Date.now() - t0), bar = document.getElementById('offerBar');
+    if (bar) bar.style.width = Math.max(0, left / (OFFER_SECONDS * 10)) + '%';
+    if (left <= 0) { clearInterval(offerTimer); if (offeredOrderId === orderId) { toast('Hết thời gian nhận đơn'); rejectOrder(orderId); } }
+  }, 100);
+}
+function tripTools(o, to) {
+  const ph = (to === o.destination && o.delivery && o.delivery.receiverPhone) || o.customerPhone;
+  const tel = ph ? `<a class="tool-btn" href="tel:${ph}">📞 Gọi ${to === o.destination && o.delivery ? "người nhận" : "khách"}</a>` : '';
+  return `<div class="tool-row"><button class="tool-btn" onclick="openChatWith('${o.id}')">💬 Nhắn tin</button>${tel}<a class="tool-btn" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${to.lat},${to.lng}">🧭 Chỉ đường</a></div>`;
+}
+function refreshStats() {
+  const d = currentDriver(); if (!d) return;
+  const t0 = new Date().setHours(0, 0, 0, 0);
+  const tx = DB().transactions.filter(x => x.driverId === d.id && x.type !== 'withdraw' && x.time >= t0);
+  document.getElementById('todayTrips').textContent = tx.filter(x => x.type === 'earn').length;
+  document.getElementById('todayEarn').textContent = tx.reduce((a, x) => a + x.amount, 0).toLocaleString('vi-VN') + 'đ';
+}
+function renderWeek() {
+  const d = currentDriver(), el = document.getElementById('weekChart'); if (!d || !el) return;
+  const days = [...Array(7)].map((_, i) => { const dt = new Date(); dt.setHours(0, 0, 0, 0); dt.setDate(dt.getDate() - (6 - i)); return dt; });
+  const sums = days.map(dt => DB().transactions.filter(x => x.driverId === d.id && x.type === 'earn' && x.time >= dt.getTime() && x.time < dt.getTime() + 864e5).reduce((a, x) => a + x.amount, 0));
+  const max = Math.max(...sums, 1), total = sums.reduce((a, b) => a + b, 0);
+  el.innerHTML = `<div class="wk-head"><span>Thu nhập 7 ngày qua</span><b>${total.toLocaleString('vi-VN')}đ</b></div><div class="wk-bars">` +
+    sums.map((v, i) => `<div class="wk-col"><div class="wk-bar ${i === 6 ? 'today' : ''}" style="height:${Math.max(4, v / max * 100)}%"></div><span>${['CN','T2','T3','T4','T5','T6','T7'][days[i].getDay()]}</span></div>`).join('') + '</div>';
+}
+const _ri = renderIncome; renderIncome = function () { _ri(); const dd = currentDriver(), cl = document.getElementById('codLine'); if (dd && cl) cl.textContent = dd.codHolding ? '💼 Đang giữ hộ (COD): ' + dd.codHolding.toLocaleString('vi-VN') + 'đ — nộp lại cho admin' : ''; renderWeek(); refreshStats(); };
+const _rac = renderAccount; renderAccount = function () { _rac(); const l = document.getElementById('supportLink'); if (l) l.href = 'tel:' + DB().config.bank.zalo; };
+function quickReply(t){const i=document.getElementById("chatInput");i.value=t;sendMessage();}
+
+// Khởi động
+function enterDriverApp(d) {
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('appView').style.display = 'flex';
+  document.getElementById('headerName').textContent = d.name;
+  document.getElementById('headerSub').textContent = d.plate + ' • ' + d.vehicle;
+  document.getElementById('headerAvatar').innerHTML = d.avatar ? `<img src="${d.avatar}">` : d.name[0];
+  bindPresence(d.id);
+  renderAccount();
+  renderIncome();
+}
+// Realtime: đơn bị người khác nhận/hủy, đơn hoàn tất, ví, lịch sử… tự cập nhật
+const refreshDriver = debounce(() => {
+  const d = currentDriver();
+  if (!d || document.getElementById('appView').style.display !== 'flex') return;
+  if (d.status !== 'active') { toast('Tài khoản đã bị khóa'); logoutDriver(); setTimeout(() => location.reload(), 1200); return; }
+  if (offeredOrderId && !currentOrderId) {
+    const o = DB().orders.find(x => x.id === offeredOrderId);
+    if (!o || o.status !== 'pending') { toast('Đơn đã có người nhận hoặc đã bị hủy'); resetOfferPanel(); }
+  }
+  if (currentOrderId) {
+    const o = DB().orders.find(x => x.id === currentOrderId);
+    if (o && o.status === 'delivered') { const done = o; onOrderDelivered(done); }
+    else if (o && o.status === 'cancelled') { toast('Khách đã hủy chuyến'); finishOrderUI(); }
+  }
+  renderAccount(); renderIncome();
+  if (document.getElementById('page-orders').classList.contains('active')) renderOrders();
+  if (document.getElementById('page-chat').classList.contains('active')) renderChatList();
+}, 150);
+onDBChange(type => { if (type === 'change') refreshDriver(); });
+dbReady.then(() => { const d = currentDriver(); if (d && d.status === 'active') enterDriverApp(d); });
+onDBChange((t, e) => { if (t === 'error' && window.__showErr) window.__showErr('Firebase: ' + ((e && e.message) || e)); });
+</script>
+</body>
+</html>

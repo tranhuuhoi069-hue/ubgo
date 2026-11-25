@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<script>
+(function(){var box;function show(m){if(!box){box=document.createElement('div');box.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#B42318;color:#fff;font:12px/1.4 monospace;padding:10px 12px;border-radius:12px;max-height:40vh;overflow:auto;white-space:pre-wrap';box.onclick=function(){box.style.display='none'};var add=function(){document.body.appendChild(box)};document.body?add():addEventListener('DOMContentLoaded',add)}box.style.display='block';box.textContent+=m+'\n\n(chạm để ẩn)\n\n'}
+window.__showErr=show;
+addEventListener('error',function(e){if(e.target&&e.target.src)show('Không tải được: '+e.target.src);else show('Lỗi: '+e.message+' ('+(e.filename||'').split('/').pop()+':'+e.lineno+')')},true);
+addEventListener('unhandledrejection',function(e){show('Lỗi: '+(e.reason&&e.reason.message||e.reason))});
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>UBGO - Khách hàng</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root { --primary:#0A8F5B; --success:#00C853; --danger:#FF3D00; --warning:#FFA000; --text:#1A1A1A; --text-sec:#8A8A8E; --bg:#F2F3F5; --card:#FFF; --border:#E5E5EA; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); height:100vh; overflow:hidden; display:flex; flex-direction:column; color:var(--text); }
+
+  /* AUTH */
+  #authView { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; padding:20px; background:linear-gradient(135deg, #0A8F5B, #056B43); }
+  .auth-box { background:var(--card); padding:30px 24px; border-radius:20px; width:100%; max-width:360px; box-shadow:0 10px 30px rgba(0,0,0,0.2); text-align:center; }
+  .auth-box img { width:80px; height:80px; border-radius:20px; object-fit:cover; margin-bottom:16px; }
+  .auth-box h1 { font-size:22px; margin-bottom:8px; font-weight:800; }
+  .auth-box p { font-size:13px; color:var(--text-sec); margin-bottom:20px; }
+  .auth-box input { width:100%; padding:14px; border:2px solid var(--border); border-radius:12px; font-size:15px; margin-bottom:12px; outline:none; }
+  .auth-box input:focus { border-color:var(--primary); }
+  .auth-box button { width:100%; padding:14px; background:var(--primary); color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; }
+  .auth-toggle { margin-top:16px; font-size:13px; color:var(--primary); font-weight:600; cursor:pointer; }
+
+  /* APP */
+  #appView { display:none; flex-direction:column; height:100vh; }
+  .status-bar { height:44px; background:var(--primary); display:flex; align-items:center; justify-content:space-between; padding:0 20px; font-size:12px; font-weight:600; color:#fff; flex-shrink:0; }
+  .app-header { background:var(--primary); padding:8px 20px 20px; display:flex; align-items:center; gap:14px; color:#fff; flex-shrink:0; border-radius:0 0 24px 24px; box-shadow:0 4px 20px rgba(10,108,255,0.2); }
+  .app-header .avatar { width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; border:2px solid rgba(255,255,255,0.5); overflow:hidden; }
+  .app-header .avatar img { width:100%; height:100%; object-fit:cover; }
+  .app-header .user-info { flex:1; }
+  .app-header .user-info h3 { font-size:16px; font-weight:700; margin-bottom:2px; }
+  .app-header .user-info p { font-size:11px; opacity:0.85; }
+
+  .main-content { flex:1; overflow-y:auto; position:relative; }
+  .tab-page { display:none; padding-bottom:90px; animation:fadeIn 0.25s ease; }
+  .tab-page.active { display:block; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  #map { height:340px; margin:0; z-index:1; }
+  .sheet { background:var(--card); border-radius:24px 24px 0 0; padding:20px 20px 24px; box-shadow:0 -4px 24px rgba(0,0,0,0.08); margin-top:-20px; position:relative; z-index:2; min-height:300px; }
+  .sheet .handle { width:40px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 16px; }
+  .sheet h2 { font-size:18px; margin-bottom:16px; font-weight:800; }
+  .input-group { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; position:relative; }
+  .input-group::before { content:''; position:absolute; left:19px; top:30px; bottom:30px; width:2px; background:var(--border); z-index:0; }
+  .input-row { display:flex; align-items:center; gap:14px; background:#FAFBFC; border:1px solid var(--border); padding:14px 16px; border-radius:14px; cursor:pointer; position:relative; z-index:1; }
+  .input-row .dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; border:3px solid #fff; box-shadow:0 0 0 2px currentColor; }
+  .dot.green { color:var(--success); background:var(--success); }
+  .dot.red { color:var(--danger); background:var(--danger); }
+  .input-row .label { font-size:11px; color:var(--text-sec); font-weight:600; text-transform:uppercase; }
+  .input-row .value { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:250px; margin-top:2px; }
+  .service-list { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+  .service-item { background:#FAFBFC; border:2px solid var(--border); border-radius:14px; padding:14px 8px; text-align:center; cursor:pointer; transition:all .2s; }
+  .service-item.active { background:#E3F5EC; border-color:var(--primary); }
+  .service-item .icon { font-size:26px; margin-bottom:6px; }
+  .service-item .name { font-size:10px; font-weight:700; }
+  .price-box { background:linear-gradient(135deg,#E3F5EC,#EAF7F0); border-radius:14px; padding:16px; margin-bottom:16px; }
+  .price-row { display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px; }
+  .price-row:last-child { margin-bottom:0; padding-top:8px; border-top:1px dashed var(--border); font-size:15px; font-weight:700; }
+  .price-row .label { color:var(--text-sec); }
+  .price-row:last-child .value { color:var(--primary); font-weight:800; font-size:18px; }
+  .btn { width:100%; padding:16px; background:var(--primary); color:#fff; border:none; border-radius:14px; font-size:15px; font-weight:700; cursor:pointer; }
+  .btn:disabled { background:#ccc; cursor:not-allowed; }
+  .btn-secondary { background:var(--bg); color:var(--text); }
+  .trip-card { background:#FAFBFC; border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:16px; }
+  .trip-card .row { display:flex; justify-content:space-between; margin-bottom:10px; font-size:13px; }
+  .trip-card .row:last-child { margin-bottom:0; }
+  .trip-card .row .label { color:var(--text-sec); }
+  .trip-card .row .value { font-weight:700; }
+  .driver-card { display:flex; align-items:center; gap:14px; background:linear-gradient(135deg,#E3F5EC,#EAF7F0); border-radius:14px; padding:16px; margin-bottom:16px; }
+  .driver-card .avatar { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,var(--primary),#34C38A); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:20px; overflow:hidden; }
+  .driver-card .avatar img { width:100%; height:100%; object-fit:cover; }
+  .driver-card .info h4 { font-size:15px; font-weight:700; }
+  .driver-card .info p { font-size:12px; color:var(--text-sec); }
+  .driver-card .actions { display:flex; gap:8px; }
+  .driver-card .action-btn { width:40px; height:40px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  .driver-card .action-btn.primary { background:var(--primary); color:#fff; }
+
+  .search-overlay { position:fixed; inset:0; background:var(--card); z-index:2000; display:none; flex-direction:column; }
+  .search-overlay.active { display:flex; }
+  .search-header { padding:12px 16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  .search-header .back { font-size:22px; cursor:pointer; }
+  .search-header input { flex:1; border:none; outline:none; font-size:15px; padding:12px 16px; background:var(--bg); border-radius:12px; }
+  .search-results { flex:1; overflow-y:auto; padding:8px 16px; }
+  .search-item { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:start; gap:14px; cursor:pointer; }
+  .search-item .icon { color:var(--primary); font-size:18px; margin-top:2px; }
+  .search-item .text .title { font-size:14px; font-weight:600; margin-bottom:2px; }
+  .search-item .text .subtitle { font-size:12px; color:var(--text-sec); }
+  .loading { text-align:center; padding:24px; color:var(--text-sec); font-size:13px; }
+
+  .tab-bar { height:72px; background:var(--card); display:flex; border-top:1px solid var(--border); flex-shrink:0; padding-bottom:env(safe-area-inset-bottom); }
+  .tab-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; color:var(--text-sec); font-size:10px; gap:4px; font-weight:600; position:relative; }
+  .tab-item.active { color:var(--primary); }
+  .tab-item .icon { font-size:22px; }
+  .tab-item .badge { position:absolute; top:8px; right:calc(50% - 18px); background:var(--danger); color:#fff; font-size:9px; padding:2px 6px; border-radius:10px; font-weight:700; min-width:18px; text-align:center; }
+
+  .section { padding:16px; }
+  .section-title { font-size:15px; font-weight:800; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .list-item { background:var(--card); border-radius:14px; padding:16px; margin-bottom:10px; display:flex; align-items:center; gap:14px; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+  .list-item .icon-box { width:44px; height:44px; border-radius:12px; background:#E3F5EC; color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+  .list-item .info { flex:1; min-width:0; }
+  .list-item .info .title { font-size:14px; font-weight:700; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .list-item .info .subtitle { font-size:11px; color:var(--text-sec); }
+  .list-item .value { font-size:14px; font-weight:800; color:var(--primary); white-space:nowrap; }
+
+  .profile-card { background:var(--card); border-radius:16px; padding:28px 20px; text-align:center; margin-bottom:16px; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+  .profile-card .avatar { width:88px; height:88px; border-radius:50%; background:linear-gradient(135deg,var(--primary),#34C38A); color:#fff; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:800; margin:0 auto 14px; overflow:hidden; }
+  .profile-card .avatar img { width:100%; height:100%; object-fit:cover; }
+  .profile-card h2 { font-size:20px; margin-bottom:6px; font-weight:800; }
+  .profile-card p { font-size:13px; color:var(--text-sec); font-weight:600; }
+  .profile-card .vip { display:inline-block; margin-top:8px; background:linear-gradient(135deg,#FFD700,#FFA000); color:#fff; padding:4px 14px; border-radius:20px; font-size:11px; font-weight:800; }
+  .profile-card .stats-row { display:flex; justify-content:space-around; margin-top:20px; padding-top:20px; border-top:1px solid var(--border); }
+  .profile-card .stats-row .s .v { font-size:18px; font-weight:800; color:var(--primary); }
+  .profile-card .stats-row .s .l { font-size:11px; color:var(--text-sec); margin-top:2px; }
+  .menu-item { background:var(--card); border-radius:14px; padding:16px; margin-bottom:8px; display:flex; align-items:center; gap:14px; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+  .menu-item .icon { font-size:22px; width:32px; text-align:center; }
+  .menu-item .label { flex:1; font-size:14px; font-weight:600; }
+  .menu-item .arrow { color:var(--text-sec); font-size:18px; }
+
+  .chat-window { position:fixed; inset:0; background:var(--bg); z-index:1000; display:none; flex-direction:column; }
+  .chat-window.active { display:flex; }
+  .chat-header { height:64px; background:var(--primary); color:#fff; display:flex; align-items:center; padding:0 16px; gap:14px; }
+  .chat-header .back { font-size:22px; cursor:pointer; }
+  .chat-header .name { flex:1; font-size:16px; font-weight:700; }
+  .chat-messages { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:10px; background:linear-gradient(180deg,#F2F3F5 0%,#E8ECF2 100%); }
+  .msg-bubble { max-width:75%; padding:12px 16px; border-radius:18px; font-size:14px; line-height:1.4; word-wrap:break-word; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .msg-bubble.incoming { background:var(--card); align-self:flex-start; border-bottom-left-radius:6px; }
+  .msg-bubble.outgoing { background:var(--primary); color:#fff; align-self:flex-end; border-bottom-right-radius:6px; }
+  .msg-time { font-size:10px; color:var(--text-sec); margin-top:6px; }
+  .msg-bubble.outgoing .msg-time { color:rgba(255,255,255,.7); }
+  .chat-input-bar { padding:12px 16px; background:var(--card); display:flex; gap:10px; align-items:center; border-top:1px solid var(--border); }
+  .chat-input-bar input { flex:1; padding:14px 18px; border:none; background:var(--bg); border-radius:24px; outline:none; font-size:14px; }
+  .chat-input-bar .send { width:44px; height:44px; border-radius:50%; background:var(--primary); color:#fff; border:none; font-size:18px; cursor:pointer; }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2000; display:none; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.active { display:flex; }
+  .modal { background:var(--card); border-radius:20px; padding:24px; width:100%; max-width:340px; max-height:90vh; overflow-y:auto; }
+  .modal h3 { font-size:17px; margin-bottom:14px; font-weight:800; }
+  .form-group { margin-bottom:12px; }
+  .form-group label { display:block; font-size:12px; color:var(--text-sec); font-weight:600; margin-bottom:6px; }
+  .form-group input { width:100%; padding:12px 14px; border:2px solid var(--border); border-radius:10px; font-size:14px; outline:none; }
+  .form-group input:focus { border-color:var(--primary); }
+  .modal .row { display:flex; gap:10px; margin-top:16px; }
+  .modal .btn { flex:1; padding:12px; border-radius:10px; border:none; font-size:14px; font-weight:700; cursor:pointer; }
+  .modal .btn-cancel { background:var(--bg); color:var(--text-sec); }
+  .modal .btn-confirm { background:var(--primary); color:#fff; }
+  .zalo-btn { display:inline-block; background:#0068FF; color:#fff; padding:12px 22px; border-radius:12px; font-size:14px; font-weight:700; text-decoration:none; margin-top:12px; text-align:center; }
+
+  .toast { position:fixed; top:70px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.88); color:#fff; padding:12px 22px; border-radius:24px; font-size:13px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:9999; font-weight:600; }
+  .toast.show { opacity:1; }
+
+/* ===== UBGO theme v2 (thống nhất 3 app) ===== */
+:root{--primary:#0A8F5B;--success:#12B76A;--danger:#E5484D;--warning:#F59E0B;--text:#10231A;--text-sec:#6B7D74;--bg:#F3F6F4;--border:#E3EAE6;--ink:#0B1F17}
+*{font-family:'Be Vietnam Pro',-apple-system,'Segoe UI',Roboto,sans-serif!important}
+body{background:var(--bg)}
+.status-bar{background:var(--ink)!important;font-size:11px}
+.app-header{background:linear-gradient(160deg,#0B9D63,#066B43)!important;border-radius:0 0 28px 28px!important;box-shadow:0 10px 24px rgba(6,107,67,.25)}
+#loginView,#authView{background:radial-gradient(120% 80% at 20% 0%,#12B76A 0%,#066B43 55%,#0B1F17 100%)!important}
+.login-box,.auth-box{border-radius:28px!important;box-shadow:0 24px 60px rgba(0,0,0,.35)!important}
+.login-box button,.auth-box button,.btn-accept,.modal .btn-confirm,.btn.btn-primary{background:linear-gradient(135deg,#12B76A,#0A8F5B)!important;box-shadow:0 6px 16px rgba(10,143,91,.3)}
+.btn-reject{background:#EDF1EF!important}
+.card,.list-item,.stats,.profile-card,.menu-item,.chat-list-item{border-radius:20px!important;box-shadow:0 1px 2px rgba(11,31,23,.04),0 8px 24px rgba(11,31,23,.05)!important;border:none!important}
+.tab-bar{margin:0 12px calc(10px + env(safe-area-inset-bottom));border-radius:24px;height:66px!important;border:none!important;box-shadow:0 10px 32px rgba(11,31,23,.16);padding-bottom:0!important}
+.tab-item{position:relative;transition:color .2s}
+.tab-item.active::before{content:'';position:absolute;top:0;width:26px;height:3px;border-radius:0 0 4px 4px;background:var(--primary)}
+.tab-item.active .icon{transform:translateY(-2px) scale(1.08)}
+.bottom-panel{border-radius:28px 28px 0 0!important}
+.order-card{border-radius:20px!important;background:#fff!important;border:1px solid var(--border)!important}
+.order-card .price{font-size:26px!important;letter-spacing:-.5px}
+.wallet-card{background:linear-gradient(135deg,#0B9D63,#055C39)!important;border-radius:24px!important;box-shadow:0 14px 30px rgba(6,107,67,.3)!important}
+.wallet-card .btn-withdraw{color:#066B43!important}
+.stat .value{font-size:19px!important}
+.msg-bubble{border-radius:20px!important}
+.chat-messages{background:#E9F0EC!important}
+.toast{border-radius:16px!important;background:var(--ink)!important}
+/* thanh đếm ngược nhận đơn */
+.offer-timer{height:6px;border-radius:6px;background:#E3EAE6;overflow:hidden;margin-top:12px}
+.offer-timer i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#F59E0B,#E5484D);transition:width .1s linear}
+/* công cụ chuyến đi */
+.tool-row{display:flex;gap:8px;margin-top:10px}
+.tool-btn{flex:1;text-align:center;padding:11px 6px;border-radius:14px;background:#E3F5EC;color:#066B43;font-size:12px;font-weight:700;text-decoration:none;border:none;cursor:pointer}
+.quick-replies{display:flex;gap:8px;overflow-x:auto;padding:8px 14px;background:var(--card);border-top:1px solid var(--border)}
+.quick-replies button{flex-shrink:0;border:1px solid var(--border);background:#fff;border-radius:18px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer}
+/* biểu đồ 7 ngày */
+.week-chart{background:var(--card);border-radius:20px;padding:16px;margin-bottom:16px;box-shadow:0 8px 24px rgba(11,31,23,.05)}
+.wk-head{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--text-sec);font-weight:600}.wk-head b{font-size:18px;color:var(--text)}
+.wk-bars{display:flex;gap:8px;align-items:flex-end;height:96px;margin-top:14px}
+.wk-col{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;font-size:10px;color:var(--text-sec);font-weight:600}
+.wk-bar{width:100%;border-radius:8px 8px 4px 4px;background:#BFE8D3}.wk-bar.today{background:var(--primary)}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.mini{background:var(--card);border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(11,31,23,.05)}.mini b{display:block;font-size:22px}.mini span{font-size:11px;color:var(--text-sec);font-weight:600}
+/* đánh giá sao + gọi tài xế */
+.star-row{display:flex;justify-content:center;gap:6px;font-size:38px;margin:6px 0 14px}
+.star-row span{color:#D5DDD9;cursor:pointer}.star-row span.on{color:#FFB400}
+.call-btn{width:42px;height:42px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:18px;margin-left:auto}
+.dl-box{background:#EAF7F0;border-radius:14px;padding:10px 12px;font-size:12px;line-height:1.7;margin-top:10px}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="authView">
+  <div class="auth-box">
+    <img src="https://i.ibb.co/DPbGZ7NG/logo.png" onerror="this.style.display='none'">
+    <h1 id="authTitle">UBGO Khách</h1>
+    <p id="authSub">Đăng nhập để đặt xe</p>
+    <input id="authUsername" placeholder="Tên đăng nhập" autocomplete="off">
+    <input id="authPassword" type="password" placeholder="Mật khẩu" autocomplete="off">
+    <input id="authName" placeholder="Họ tên (nếu đăng ký)" style="display:none;">
+    <input id="authPhone" placeholder="Số điện thoại (nếu đăng ký)" style="display:none;">
+    <button onclick="doAuth()" id="authBtn">Đăng nhập</button>
+    <div class="auth-toggle" onclick="toggleAuthMode()" id="authToggle">Chưa có tài khoản? Đăng ký</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appView">
+  <div class="status-bar"><span id="clock">--:--</span><span id="netStatus">…</span></div>
+  <div class="app-header">
+    <div class="avatar" id="headerAvatar">A</div>
+    <div class="user-info"><h3 id="headerName">Khách</h3><p id="headerSub">--</p></div>
+  </div>
+
+  <div class="main-content">
+    <!-- HOME -->
+    <div class="tab-page active" id="page-home">
+      <div id="map"></div>
+      <div class="sheet" id="sheet-home">
+        <div class="handle"></div>
+        <h2>Bạn muốn đi đâu?</h2>
+        <div class="input-group">
+          <div class="input-row" onclick="openSearch('pickup')"><div class="dot green"></div><div style="flex:1"><div class="label">Điểm đón</div><div class="value" id="pickupText">Chọn điểm đón</div></div></div>
+          <div class="input-row" onclick="openSearch('destination')"><div class="dot red"></div><div style="flex:1"><div class="label">Điểm đến</div><div class="value" id="destText">Chọn điểm đến</div></div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="btn btn-secondary" style="padding:10px;font-size:12px;" onclick="openSavedAddress()">📍 Địa chỉ đã lưu</button>
+          <button class="btn btn-secondary" style="padding:10px;font-size:12px;" onclick="openCustomAddress()">✏️ Tự nhập</button>
+        </div>
+        <div class="service-list">
+          <div class="service-item active" data-service="Bike" data-price="15000"><div class="icon">🛵</div><div class="name">Bike</div></div>
+          <div class="service-item" data-service="Car" data-price="45000"><div class="icon">🚗</div><div class="name">Car</div></div>
+          <div class="service-item" data-service="Food" data-price="25000"><div class="icon">🍜</div><div class="name">Food</div></div>
+          <div class="service-item" data-service="Delivery" data-price="20000"><div class="icon">📦</div><div class="name">Giao</div></div>
+        </div>
+        <div class="price-box" id="priceBox" style="display:none;">
+          <div class="price-row"><span class="label">Khoảng cách</span><span class="value" id="estDist">--</span></div>
+          <div class="price-row"><span class="label">Thời gian</span><span class="value" id="estTime">--</span></div>
+          <div class="price-row"><span class="label">Tổng tiền</span><span class="value" id="estPrice">--</span></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input id="voucherInput" placeholder="Nhập mã ưu đãi" style="flex:1;padding:12px;border:2px solid var(--border);border-radius:10px;font-size:13px;outline:none">
+          <button class="btn btn-secondary" style="width:auto;padding:12px 20px;" onclick="applyVoucher()">Áp dụng</button>
+        </div>
+        <button class="btn" id="btnBook" disabled>Đặt xe ngay</button>
+      </div>
+      <div class="sheet" id="sheet-waiting" style="display:none;">
+        <div class="handle"></div>
+        <h2 id="waitTitle">Đang tìm tài xế gần bạn...</h2>
+        <div class="driver-card" id="driverCard" style="display:none;">
+          <div class="avatar" id="driverAvatar">H</div>
+          <div class="info"><h4 id="driverName">--</h4><p id="driverVehicle">--</p></div>
+          <div class="actions"><div class="action-btn primary" onclick="openDriverChat()">💬</div></div>
+        </div>
+        <div class="trip-card">
+          <div class="row"><span class="label">Dịch vụ</span><span class="value" id="tripService">--</span></div>
+          <div class="row"><span class="label">Tổng tiền</span><span class="value" id="tripPrice">--</span></div>
+        </div>
+        <button class="btn" id="btnCustomerConfirm" style="display:none;background:var(--success);" onclick="customerConfirm()">✅ Xác nhận đã giao đơn cho tài xế</button>
+        <button class="btn btn-secondary" id="btnCancel" style="margin-top:8px;">Hủy chuyến</button>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="tab-page" id="page-orders">
+      <div class="section"><div class="section-title">📋 Đơn hàng của bạn</div><div id="ordersList"></div></div>
+    </div>
+
+    <!-- WALLET -->
+    <div class="tab-page" id="page-wallet">
+      <div class="section">
+        <div style="background:linear-gradient(135deg,var(--primary),#34C38A);border-radius:16px;padding:24px;color:#fff;margin-bottom:16px;box-shadow:0 4px 20px rgba(10,108,255,.3);">
+          <div style="font-size:12px;opacity:.85;font-weight:600;margin-bottom:6px;">Số dư ví</div>
+          <div style="font-size:32px;font-weight:800;margin-bottom:20px;" id="walletBalance">0đ</div>
+          <button class="btn" style="background:#fff;color:var(--primary);" onclick="openTopupModal()">Nạp tiền</button>
+        </div>
+        <div class="section-title">🎁 Voucher của tôi</div>
+        <div id="voucherList"></div>
+        <div class="section-title" style="margin-top:20px;">💳 Lịch sử nạp</div>
+        <div id="topupHistory"></div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="tab-page" id="page-chat">
+      <div class="section"><div class="section-title">💬 Tin nhắn</div><div id="chatList"></div></div>
+    </div>
+
+    <!-- ACCOUNT -->
+    <div class="tab-page" id="page-account">
+      <div class="section">
+        <div class="profile-card">
+          <div class="avatar" id="profileAvatar">A</div>
+          <h2 id="profileName">--</h2>
+          <p id="profilePhone">--</p>
+          <div class="vip" id="profileVip" style="display:none;">👑 THÀNH VIÊN VIP</div>
+          <div class="stats-row">
+            <div class="s"><div class="v" id="profileTrips">0</div><div class="l">Chuyến đi</div></div>
+            <div class="s"><div class="v" id="profileSpent">0đ</div><div class="l">Đã chi</div></div>
+          </div>
+        </div>
+        <div class="menu-item" onclick="openSavedAddress()"><span class="icon">📍</span><span class="label">Địa chỉ đã lưu</span><span class="arrow">›</span></div>
+        <div class="menu-item" onclick="openTopupModal()"><span class="icon">💳</span><span class="label">Nạp tiền</span><span class="arrow">›</span></div>
+        <div class="menu-item" onclick="switchTab('wallet')"><span class="icon">💰</span><span class="label">Ví của tôi</span><span class="arrow">›</span></div>
+        <div class="menu-item" style="color:var(--danger);" onclick="doLogout()"><span class="icon">🚪</span><span class="label" style="color:var(--danger);">Đăng xuất</span><span class="arrow">›</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item active" data-tab="home" onclick="switchTab('home')"><div class="icon">🏠</div><div>Trang chủ</div></div>
+    <div class="tab-item" data-tab="orders" onclick="switchTab('orders')"><div class="icon">📋</div><div>Đơn hàng</div></div>
+    <div class="tab-item" data-tab="wallet" onclick="switchTab('wallet')"><div class="icon">💰</div><div>Ví</div></div>
+    <div class="tab-item" data-tab="chat" onclick="switchTab('chat')"><div class="icon">💬</div><div>Tin nhắn</div></div>
+    <div class="tab-item" data-tab="account" onclick="switchTab('account')"><div class="icon">👤</div><div>Tài khoản</div></div>
+  </div>
+</div>
+
+<!-- CHAT WINDOW -->
+<div class="chat-window" id="chatWindow">
+  <div class="chat-header"><div class="back" onclick="closeChat()">←</div><div class="name" id="chatName">Tài xế</div></div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="quick-replies"><button onclick="quickReply('Mình đang đứng ở điểm đón nhé')">Mình ở điểm đón</button><button onclick="quickReply('Bạn tới chưa ạ?')">Bạn tới chưa?</button><button onclick="quickReply('Mình ra ngay đây ạ')">Ra ngay</button><button onclick="quickReply('Cảm ơn bác tài!')">Cảm ơn</button></div>
+  <div class="chat-input-bar"><input id="chatInput" placeholder="Nhập tin nhắn..." onkeypress="if(event.key==='Enter')sendMessage()"><button class="send" onclick="sendMessage()">➤</button></div>
+</div>
+
+<!-- SEARCH -->
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-header"><div class="back" onclick="closeSearch()">←</div><input id="searchInput" placeholder="Nhập địa chỉ..." autocomplete="off"></div>
+  <div class="search-results" id="searchResults"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Tiêu đề</h3>
+    <div id="modalBody"></div>
+    <div class="row">
+      <button class="btn btn-cancel" onclick="closeModal()">Đóng</button>
+      <button class="btn btn-confirm" id="modalConfirm" style="display:none;">Xác nhận</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ==========================================
+// UBGO CORE — Firebase Realtime DB (dùng chung cho cả 3 app: adm / khachh / taix)
+// Giữ nguyên API cũ: DB() đọc đồng bộ từ cache realtime, DBSave() chỉ ghi phần thay đổi.
+// ==========================================
+const FIREBASE_URL = 'https://uongbigo-default-rtdb.asia-southeast1.firebasedatabase.app';
+const COLLS = ['users','drivers','orders','vouchers','events','topups','withdraws','transactions'];
+const DELTA = new Set(['balance','totalTrips','totalSpent']); // số liệu cộng/trừ → ghi bằng increment để không bị ghi đè
+const DEFAULT_CONFIG = {
+  bank: { bankId:'vietcombank', account:'1339466041', owner:'PHAM TRAN THIEN KHAI', zalo:'0339466041', zaloUrl:'https://zalo.me/0339466041' },
+  logo: 'https://i.ibb.co/DPbGZ7NG/logo.png',
+  vipThreshold: 1000000, minWithdraw: 10000, copyright: 'Thiên Khải',
+  pricing: { surgeOn: true, surgeMul: 1.2, peak: [[11, 13], [17, 19]], peakBonus: 5000, vehicles: { moto: 1, van: 2.2, truck: 3.5 } }
+};
+
+firebase.initializeApp({ databaseURL: FIREBASE_URL });
+const rootRef = firebase.database().ref();
+const inc = n => firebase.database.ServerValue.increment(n);
+
+let remote = {}, cache = emptyCache(), base = clone(cache), synced = false;
+const listeners = [];
+function emptyCache() { const c = { chats: {}, config: clone(DEFAULT_CONFIG) }; COLLS.forEach(k => c[k] = []); return c; }
+function clone(x) { return JSON.parse(JSON.stringify(x)); }
+function ss(v) { // stringify ổn định (sắp xếp key) để so sánh
+  if (v === undefined) return 'u';
+  if (v && typeof v === 'object') return Array.isArray(v) ? '[' + v.map(ss).join(',') + ']' : '{' + Object.keys(v).sort().map(k => k + ':' + ss(v[k])).join(',') + '}';
+  return JSON.stringify(v);
+}
+function toList(x) { if (x == null) return []; if (Array.isArray(x)) return x; return Object.keys(x).sort((a, b) => a - b).map(k => x[k]); }
+function normItem(c, k, v) {
+  const o = { ...v, id: k };
+  if (c === 'users') { o.addresses = toList(o.addresses); o.vouchersUsed = toList(o.vouchersUsed); }
+  if (c === 'orders' && o.routeGeometry) o.routeGeometry = toList(o.routeGeometry).map(toList);
+  return o;
+}
+function rebuild() {
+  COLLS.forEach(c => {
+    cache[c] = Object.entries(remote[c] || {}).filter(([, v]) => v && typeof v === 'object')
+      .map(([k, v]) => normItem(c, k, v)).sort((a, b) => (a.createdAt || a.time || 0) - (b.createdAt || b.time || 0));
+  });
+  cache.chats = {};
+  Object.entries(remote.chats || {}).forEach(([oid, msgs]) => {
+    cache.chats[oid] = Object.entries(msgs || {}).map(([k, m]) => ({ ...m, id: k })).sort((a, b) => (a.time || 0) - (b.time || 0));
+  });
+  const rc = remote.config || {};
+  cache.config = { ...DEFAULT_CONFIG, ...rc, bank: { ...DEFAULT_CONFIG.bank, ...(rc.bank || {}) },
+    pricing: { ...DEFAULT_CONFIG.pricing, ...(rc.pricing || {}), vehicles: { ...DEFAULT_CONFIG.pricing.vehicles, ...((rc.pricing || {}).vehicles || {}) } } };
+  base = clone(cache);
+}
+
+// ---- Đọc / ghi ----
+function DB() { return cache; }
+function uid(prefix) { return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
+
+function diff(data) {
+  const u = {};
+  COLLS.forEach(c => {
+    const was = new Map((base[c] || []).map(x => [x.id, x]));
+    const now = new Map();
+    (data[c] || []).forEach(x => { if (!x.id) x.id = uid(c[0].toUpperCase()); now.set(x.id, x); });
+    now.forEach((item, id) => {
+      const old = was.get(id);
+      if (!old) { u[`${c}/${id}`] = item; return; }
+      new Set([...Object.keys(old), ...Object.keys(item)]).forEach(k => {
+        if (k === 'id' || ss(old[k]) === ss(item[k])) return;
+        if (DELTA.has(k) && typeof item[k] === 'number' && typeof old[k] === 'number') u[`${c}/${id}/${k}`] = inc(item[k] - old[k]);
+        else u[`${c}/${id}/${k}`] = item[k] === undefined ? null : item[k];
+      });
+    });
+    was.forEach((_, id) => { if (!now.has(id)) u[`${c}/${id}`] = null; });
+  });
+  Object.entries(data.chats || {}).forEach(([oid, msgs]) => {
+    const known = new Set((base.chats[oid] || []).map(m => m.id));
+    msgs.forEach(m => { if (!m.id) m.id = uid('M'); if (!known.has(m.id)) u[`chats/${oid}/${m.id}`] = m; });
+  });
+  Object.keys(data.config || {}).forEach(k => { if (ss(data.config[k]) !== ss(base.config[k])) u[`config/${k}`] = data.config[k]; });
+  return u;
+}
+function DBSave(data) {
+  const u = diff(data || cache);
+  base = clone(data || cache);
+  if (!Object.keys(u).length) return Promise.resolve();
+  return rootRef.update(u).catch(err => { console.error(err); notify('error', err); });
+}
+
+// ---- Giao dịch nguyên tử (chống 2 tài xế nhận cùng 1 đơn, duyệt 2 lần…) ----
+async function claim(path, from, to) {
+  const r = await rootRef.child(path).transaction(cur => cur === from ? to : undefined);
+  return r.committed;
+}
+async function acceptOrder(orderId, driverId) {
+  const o = cache.orders.find(x => x.id === orderId), d = cache.drivers.find(x => x.id === driverId);
+  if (!o || !d) return { ok: false, error: 'Không tìm thấy' };
+  if (!(await claim(`orders/${orderId}/status`, 'pending', 'accepted'))) return { ok: false, error: 'Đơn đã có người nhận hoặc đã bị hủy' };
+  const driver = { id: d.id, name: d.name, vehicle: d.vehicle, plate: d.plate, phone: d.phone, avatar: d.avatar || '' };
+  await rootRef.child(`orders/${orderId}`).update({ driver, acceptedAt: Date.now() });
+  return { ok: true, order: { ...o, status: 'accepted', driver } };
+}
+async function cancelOrder(orderId) { return claim(`orders/${orderId}/status`, 'pending', 'cancelled'); }
+function setOrderStatus(orderId, status, patch = {}) { return rootRef.child(`orders/${orderId}`).update({ status, ...patch }); }
+function confirmOrderTwoWay(orderId, who) { // mỗi bên chỉ ghi cờ của mình; hoàn tất do finalizeDeliveries()
+  return rootRef.child(`orders/${orderId}/${who === 'customer' ? 'customerConfirmed' : 'driverConfirmed'}`).set(true);
+}
+const finalizing = new Set();
+async function finalizeDeliveries() {
+  for (const o of cache.orders) {
+    if (o.status !== 'delivering' || !o.customerConfirmed || !o.driverConfirmed || finalizing.has(o.id)) continue;
+    finalizing.add(o.id);
+    try {
+      if (!(await claim(`orders/${o.id}/status`, 'delivering', 'delivered'))) continue; // máy khác đã chốt
+      const t = Date.now(), up = {};
+      up[`orders/${o.id}/deliveredAt`] = t;
+      if (o.driver) {
+        const tx = uid('TX');
+        const bonus = o.surge ? (cache.config.pricing.peakBonus || 0) : 0;
+        up[`drivers/${o.driver.id}/balance`] = inc(o.price + bonus);
+        if (bonus) { const bt = uid('TX'); up[`transactions/${bt}`] = { id: bt, type: 'bonus', driverId: o.driver.id, amount: bonus, orderId: o.id, time: t, createdAt: t }; }
+        if (o.delivery && o.delivery.cod) up[`drivers/${o.driver.id}/codHolding`] = inc(o.delivery.cod);
+        up[`drivers/${o.driver.id}/totalTrips`] = inc(1);
+        up[`transactions/${tx}`] = { id: tx, type: 'earn', driverId: o.driver.id, amount: o.price, orderId: o.id, time: t, createdAt: t };
+      }
+      if (o.userId) { up[`users/${o.userId}/totalTrips`] = inc(1); up[`users/${o.userId}/totalSpent`] = inc(o.price); }
+      await rootRef.update(up);
+    } catch (e) { console.error(e); finalizing.delete(o.id); }
+  }
+}
+
+// ---- Phiên đăng nhập: lưu riêng từng thiết bị (không dùng chung qua DB) ----
+const Sess = {
+  get: k => { try { return localStorage.getItem('ubgo_sess_' + k) || null; } catch { return null; } },
+  set: (k, v) => { try { v == null ? localStorage.removeItem('ubgo_sess_' + k) : localStorage.setItem('ubgo_sess_' + k, v); } catch {} }
+};
+
+// ---- Sự kiện realtime + trạng thái kết nối ----
+function notify(type, payload) { listeners.forEach(fn => { try { fn(type, payload); } catch (e) { console.error(e); } }); }
+function onDBChange(fn) { listeners.push(fn); }
+let connected = false;
+function paintNet() {
+  const el = document.getElementById('netStatus');
+  if (el) el.innerHTML = connected ? '<span style="color:#7CFFB0">●</span> Đã kết nối' : '<span style="color:#FFB74D">●</span> Đang kết nối...';
+}
+document.addEventListener('DOMContentLoaded', paintNet);
+firebase.database().ref('.info/connected').on('value', s => { connected = !!s.val(); paintNet(); });
+
+let _resolveReady; const dbReady = new Promise(r => _resolveReady = r);
+setTimeout(() => _resolveReady(), 6000); // mạng chậm vẫn mở được app
+rootRef.on('value', snap => {
+  remote = snap.val() || {};
+  if (!synced) { synced = true; if (!remote.config) rootRef.child('config').set(DEFAULT_CONFIG); }
+  rebuild(); _resolveReady();
+  finalizeDeliveries();
+  notify('change');
+}, err => { console.error(err); notify('error', err); _resolveReady(); });
+
+function haversineKm(a, b) {
+  const R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+  const s1 = Math.sin(dLat / 2), s2 = Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(s1 * s1 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * s2 * s2));
+}
+function debounce(fn, ms) { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+/* ==========================================
+   USER LOGIC
+   ========================================== */
+function registerUser({ username, password, name, phone }) {
+  const db = DB();
+  if (db.users.find(u => u.username === username)) return { ok:false, error:'Tên đăng nhập đã tồn tại' };
+  const user = {
+    id: uid('U'), username, password, name, phone, avatar:'',
+    balance: 0, vip: false, addresses: [], vouchersUsed: [],
+    totalTrips: 0, totalSpent: 0, createdAt: Date.now()
+  };
+  db.users.push(user); DBSave(db); return { ok:true, user };
+}
+function loginUser(username, password) {
+  const db = DB();
+  const u = db.users.find(x => x.username === username && x.password === password);
+  if (!u) return { ok:false, error:'Sai tài khoản hoặc mật khẩu' };
+  Sess.set('user', u.id); return { ok:true, user:u };
+}
+function logoutUser() { Sess.set('user', null); }
+function currentUser() { const id = Sess.get('user'); return id ? DB().users.find(u => u.id === id) : null; }
+function updateUser(id, patch) {
+  const db = DB(); const idx = db.users.findIndex(u => u.id === id);
+  if (idx !== -1) { db.users[idx] = { ...db.users[idx], ...patch }; DBSave(db); return db.users[idx]; }
+  return null;
+}
+
+/* ==========================================
+   AUTH UI
+   ========================================== */
+let authMode = 'login';
+
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'register' : 'login';
+  const isReg = authMode === 'register';
+  document.getElementById('authTitle').textContent = isReg ? 'Đăng ký tài khoản' : 'UBGO Khách';
+  document.getElementById('authSub').textContent = isReg ? 'Tạo tài khoản để đặt xe' : 'Đăng nhập để đặt xe';
+  document.getElementById('authBtn').textContent = isReg ? 'Đăng ký' : 'Đăng nhập';
+  document.getElementById('authToggle').textContent = isReg ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký';
+  document.getElementById('authName').style.display = isReg ? 'block' : 'none';
+  document.getElementById('authPhone').style.display = isReg ? 'block' : 'none';
+}
+
+function doAuth() {
+  const u = document.getElementById('authUsername').value.trim();
+  const p = document.getElementById('authPassword').value;
+  if (!u || !p) { toast('Nhập đủ thông tin'); return; }
+
+  if (authMode === 'register') {
+    const name = document.getElementById('authName').value.trim();
+    const phone = document.getElementById('authPhone').value.trim();
+    if (!name || !phone) { toast('Nhập họ tên và SĐT'); return; }
+    const r = registerUser({ username: u, password: p, name, phone });
+    if (!r.ok) { toast(r.error); return; }
+    toast('Đăng ký thành công');
+    const lr = loginUser(u, p);
+    if (lr.ok) enterApp(lr.user);
+  } else {
+    const r = loginUser(u, p);
+    if (!r.ok) { toast(r.error); return; }
+    enterApp(r.user);
+  }
+}
+
+function doLogout() { logoutUser(); location.reload(); }
+
+function enterApp(user) {
+  document.getElementById('authView').style.display = 'none';
+  document.getElementById('appView').style.display = 'flex';
+  document.getElementById('headerName').textContent = user.name;
+  document.getElementById('headerSub').textContent = user.phone;
+  document.getElementById('headerAvatar').innerHTML = user.avatar ? `<img src="${user.avatar}">` : user.name[0];
+  initMap();
+  renderProfile();
+  renderWallet();
+  renderOrders();
+  renderChatList();
+}
+
+/* ==========================================
+   MAP
+   ========================================== */
+let map, pickupMarker, destMarker, routeLine;
+const DEFAULT_CENTER = [20.9435, 106.7898];
+
+function initMap() {
+  if (map) { map.invalidateSize(); return; }
+  map = L.map('map', { zoomControl:false }).setView(DEFAULT_CENTER, 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OSM' }).addTo(map);
+}
+
+/* ==========================================
+   TAB / CLOCK / TOAST
+   ========================================== */
+function toast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+function updateClock() { const n = new Date(); document.getElementById('clock').textContent = String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); }
+updateClock(); setInterval(updateClock, 30000);
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab-item[data-tab="${tab}"]`).classList.add('active');
+  if (tab === 'orders') renderOrders();
+  if (tab === 'wallet') renderWallet();
+  if (tab === 'chat') renderChatList();
+  if (tab === 'account') renderProfile();
+  setTimeout(() => map && map.invalidateSize(), 100);
+}
+
+/* ==========================================
+   SEARCH / ĐỊA CHỈ
+   ========================================== */
+let searchTarget = 'pickup';
+let pickup = null, destination = null;
+let selectedService = 'Bike', selectedBasePrice = 15000;
+let appliedVoucher = null;
+
+function openSearch(target) {
+  searchTarget = target;
+  document.getElementById('searchOverlay').classList.add('active');
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchResults').innerHTML = '<div class="loading">Nhập địa chỉ để tìm...</div>';
+  document.getElementById('searchInput').focus();
+}
+function closeSearch() { document.getElementById('searchOverlay').classList.remove('active'); }
+
+let searchTimer = null;
+document.addEventListener('input', e => {
+  if (e.target.id !== 'searchInput') return;
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  if (q.length < 3) { document.getElementById('searchResults').innerHTML = '<div class="loading">Nhập thêm để tìm...</div>'; return; }
+  searchTimer = setTimeout(() => performSearch(q), 500);
+});
+
+async function performSearch(q) {
+  document.getElementById('searchResults').innerHTML = '<div class="loading">Đang tìm...</div>';
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=8&accept-language=vi&q=' + encodeURIComponent(q);
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    const arr = await res.json();
+    if (!arr.length) { document.getElementById('searchResults').innerHTML = '<div class="loading">Không tìm thấy địa chỉ</div>'; return; }
+    document.getElementById('searchResults').innerHTML = arr.map(r => {
+      const safe = r.display_name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      return `<div class="search-item" onclick="selectAddress('${safe}', ${r.lat}, ${r.lon})">
+        <div class="icon">📍</div>
+        <div class="text"><div class="title">${r.display_name.split(',')[0]}</div><div class="subtitle">${r.display_name}</div></div>
+      </div>`;
+    }).join('');
+  } catch {
+    document.getElementById('searchResults').innerHTML = '<div class="loading">Lỗi tìm kiếm</div>';
+  }
+}
+
+function selectAddress(name, lat, lng) {
+  const addr = { name, lat: parseFloat(lat), lng: parseFloat(lng) };
+  if (searchTarget === 'pickup') {
+    pickup = addr;
+    document.getElementById('pickupText').textContent = name;
+  } else {
+    destination = addr;
+    document.getElementById('destText').textContent = name;
+  }
+  closeSearch();
+  drawRoute();
+}
+
+function openCustomAddress() {
+  openModal('Nhập địa chỉ', `
+    <div class="form-group"><label>Tên địa chỉ</label><input id="customName" placeholder="VD: Nhà riêng"></div>
+    <div class="form-group"><label>Vĩ độ (lat)</label><input id="customLat" type="number" step="0.0001" placeholder="20.9435"></div>
+    <div class="form-group"><label>Kinh độ (lng)</label><input id="customLng" type="number" step="0.0001" placeholder="106.7898"></div>
+  `, () => {
+    const name = document.getElementById('customName').value.trim();
+    const lat = parseFloat(document.getElementById('customLat').value);
+    const lng = parseFloat(document.getElementById('customLng').value);
+    if (!name || isNaN(lat) || isNaN(lng)) { toast('Nhập đủ và đúng định dạng'); return; }
+    selectAddress(name, lat, lng);
+    closeModal();
+  });
+}
+
+function openSavedAddress() {
+  const u = currentUser();
+  const list = u.addresses || [];
+  const body = list.length ? list.map((a, i) => `
+    <div style="padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer" onclick="useSavedAddr(${i})">
+      <div style="font-weight:700">${a.name}</div>
+      <div style="font-size:11px;color:var(--text-sec)">${a.lat.toFixed(4)}, ${a.lng.toFixed(4)}</div>
+    </div>`).join('') : '<div style="padding:20px;text-align:center;color:var(--text-sec)">Chưa có địa chỉ</div>';
+  openModal('Địa chỉ đã lưu', body + `
+    <div class="form-group" style="margin-top:16px"><label>Thêm địa chỉ mới</label>
+      <input id="saName" placeholder="Tên" style="margin-bottom:8px">
+      <input id="saLat" type="number" step="0.0001" placeholder="Lat" style="margin-bottom:8px">
+      <input id="saLng" type="number" step="0.0001" placeholder="Lng">
+    </div>
+    <button class="btn" style="margin-top:8px" onclick="addSavedAddr()">+ Thêm địa chỉ</button>
+  `, null);
+}
+
+function useSavedAddr(i) {
+  const u = currentUser();
+  const a = u.addresses[i];
+  if (!a) return;
+  selectAddress(a.name, a.lat, a.lng);
+  closeModal();
+}
+
+function addSavedAddr() {
+  const u = currentUser();
+  const name = document.getElementById('saName').value.trim();
+  const lat = parseFloat(document.getElementById('saLat').value);
+  const lng = parseFloat(document.getElementById('saLng').value);
+  if (!name || isNaN(lat) || isNaN(lng)) { toast('Nhập đủ'); return; }
+  const addrs = u.addresses || [];
+  addrs.push({ name, lat, lng });
+  updateUser(u.id, { addresses: addrs });
+  toast('Đã thêm');
+  closeModal();
+}
+
+function drawRoute() {
+  if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; }
+  if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+
+  if (pickup) {
+    pickupMarker = L.marker([pickup.lat, pickup.lng], { icon: L.divIcon({ className:'', html:'<div style="background:#00C853;width:14px;height:14px;border-radius:50%;border:3px solid #fff;"></div>', iconSize:[14,14] }) }).addTo(map);
+  }
+  if (destination) {
+    destMarker = L.marker([destination.lat, destination.lng], { icon: L.divIcon({ className:'', html:'<div style="background:#FF3D00;width:14px;height:14px;border-radius:50%;border:3px solid #fff;"></div>', iconSize:[14,14] }) }).addTo(map);
+  }
+  if (pickup && destination) {
+    routeLine = L.polyline([[pickup.lat, pickup.lng], [destination.lat, destination.lng]], { color:'#0A8F5B', weight:5 }).addTo(map);
+    map.fitBounds(routeLine.getBounds(), { padding:[40,40] });
+    const distKm = haversineKm(pickup, destination);
+    const durationMin = Math.max(3, Math.round(distKm * 3));
+    const price = Math.round((selectedBasePrice + distKm * 5000) / 1000) * 1000;
+    document.getElementById('priceBox').style.display = 'block';
+    document.getElementById('estDist').textContent = distKm.toFixed(1) + ' km';
+    document.getElementById('estTime').textContent = durationMin + ' phút';
+    document.getElementById('estPrice').textContent = finalPrice({ price }, true).toLocaleString('vi-VN') + 'đ';
+    window._currentEstimate = { distKm, durationMin, price };
+    document.getElementById('btnBook').disabled = false;
+  }
+}
+
+document.querySelectorAll('.service-item').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.service-item').forEach(x => x.classList.remove('active'));
+    el.classList.add('active');
+    selectedService = el.dataset.service;
+    selectedBasePrice = parseInt(el.dataset.price);
+    if (pickup && destination) drawRoute();
+  });
+});
+
+function applyVoucher() {
+  const code = document.getElementById('voucherInput').value.trim().toUpperCase();
+  if (!code) return;
+  const db = DB();
+  const v = db.vouchers.find(x => x.code === code && x.active);
+  if (!v) { toast('Mã không hợp lệ'); return; }
+  appliedVoucher = v;
+  toast('Đã áp dụng: ' + (v.type === 'percent' ? '-' + v.value + '%' : '-' + v.value.toLocaleString('vi-VN') + 'đ'));
+  if (pickup && destination) drawRoute();
+}
+
+/* ==========================================
+   ĐẶT XE
+   ========================================== */
+document.getElementById('btnBook').addEventListener('click', placeOrder);
+
+function placeOrder() {
+  const u = currentUser();
+  if (!u) return;
+  if (!pickup || !destination) { toast('Chọn điểm đón và đến'); return; }
+  const est = window._currentEstimate;
+  if (!est) return;
+
+  let price = finalPrice(est);
+  if (appliedVoucher) {
+    if (appliedVoucher.type === 'percent') price = Math.round(price * (100 - appliedVoucher.value) / 100 / 1000) * 1000;
+    else price = Math.max(0, price - appliedVoucher.value);
+  }
+
+  if (window._delivery && window._delivery.tip) price += window._delivery.tip;
+  const db = DB();
+  const order = {
+    id: uid('O'), userId: u.id, customerName: u.name, customerPhone: u.phone,
+    service: selectedService,
+    pickup: { ...pickup }, destination: { ...destination },
+    routeGeometry: [[pickup.lat, pickup.lng], [destination.lat, destination.lng]],
+    distanceKm: est.distKm, durationMin: est.durationMin,
+    price,
+    voucherApplied: appliedVoucher ? appliedVoucher.code : null,
+    status: 'pending', driver: null, vehicle: (window._delivery && window._delivery.vehicle) || 'moto', surge: surgeActive(), delivery: window._delivery || null,
+    customerConfirmed: false, driverConfirmed: false,
+    createdAt: Date.now()
+  };
+  db.orders.push(order);
+  DBSave(db);
+
+  appliedVoucher = null;
+  document.getElementById('voucherInput').value = '';
+
+  document.getElementById('sheet-home').style.display = 'none';
+  document.getElementById('sheet-waiting').style.display = 'block';
+  document.getElementById('waitTitle').textContent = 'Đang tìm tài xế gần bạn...';
+  document.getElementById('driverCard').style.display = 'none';
+  document.getElementById('driverCard').dataset.shown = '';
+  document.getElementById('tripService').textContent = selectedService;
+  document.getElementById('tripPrice').textContent = price.toLocaleString('vi-VN') + 'đ';
+  document.getElementById('btnCustomerConfirm').style.display = 'none';
+  document.getElementById('btnCancel').style.display = 'block';
+
+  window._activeOrderId = order.id;
+  startOrderPolling();
+}
+
+let orderPollTimer = null;
+function startOrderPolling() {
+  if (orderPollTimer) clearInterval(orderPollTimer);
+  orderPollTimer = setInterval(() => {
+    if (!window._activeOrderId) return;
+    const db = DB();
+    const o = db.orders.find(x => x.id === window._activeOrderId);
+    if (!o) return;
+
+    if (o.driver && !document.getElementById('driverCard').dataset.shown) {
+      document.getElementById('driverCard').style.display = 'flex';
+      document.getElementById('driverCard').dataset.shown = '1';
+      document.getElementById('driverAvatar').innerHTML = o.driver.avatar ? `<img src="${o.driver.avatar}">` : o.driver.name[0];
+      document.getElementById('driverName').textContent = o.driver.name;
+      document.getElementById('driverVehicle').textContent = o.driver.vehicle + ' • ' + o.driver.plate;
+      if (o.driver.phone) document.getElementById('driverCard').insertAdjacentHTML('beforeend', `<a class="call-btn" href="tel:${o.driver.phone}">📞</a>`);
+      document.getElementById('waitTitle').textContent = '🚗 Tài xế đang đến!';
+    }
+    if (o.status === 'delivering') {
+      document.getElementById('btnCustomerConfirm').style.display = 'block';
+      document.getElementById('waitTitle').textContent = '📦 Đang giao hàng';
+    }
+    if (o.status === 'delivered') {
+      if (!o.rating && window._rated !== o.id) { window._rated = o.id; openRateModal(o); }
+      document.getElementById('waitTitle').textContent = '🎉 Đã hoàn thành';
+      document.getElementById('btnCustomerConfirm').style.display = 'none';
+      document.getElementById('btnCancel').style.display = 'none';
+      clearInterval(orderPollTimer);
+      toast('Chuyến đi hoàn tất');
+      setTimeout(() => resetHomeSheet(), 3000);
+    }
+    if (o.status === 'cancelled') {
+      clearInterval(orderPollTimer);
+      toast('Chuyến đã bị hủy');
+      resetHomeSheet();
+    }
+  }, 2000);
+}
+
+function resetHomeSheet() {
+  document.getElementById('sheet-waiting').style.display = 'none';
+  document.getElementById('sheet-home').style.display = 'block';
+  window._activeOrderId = null; window._delivery = null; paintDeliveryBtn();
+  pickup = destination = null;
+  document.getElementById('pickupText').textContent = 'Chọn điểm đón';
+  document.getElementById('destText').textContent = 'Chọn điểm đến';
+  document.getElementById('priceBox').style.display = 'none';
+  document.getElementById('btnBook').disabled = true;
+  if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; }
+  if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  renderOrders();
+}
+
+async function customerConfirm() {
+  if (!window._activeOrderId) return;
+  await confirmOrderTwoWay(window._activeOrderId, 'customer');
+  toast('Đã xác nhận');
+  document.getElementById('btnCustomerConfirm').style.display = 'none';
+}
+
+document.getElementById('btnCancel').addEventListener('click', async () => {
+  if (!window._activeOrderId) return;
+  if (!confirm('Hủy chuyến?')) return;
+  if (await cancelOrder(window._activeOrderId)) {
+    toast('Đã hủy');
+    clearInterval(orderPollTimer);
+    resetHomeSheet();
+  } else {
+    toast('Không thể hủy — tài xế đã nhận');
+  }
+});
+
+/* ==========================================
+   ORDERS HISTORY
+   ========================================== */
+function renderOrders() {
+  const u = currentUser();
+  if (!u) return;
+  const db = DB();
+  const orders = db.orders.filter(o => o.userId === u.id).slice().reverse();
+  const list = document.getElementById('ordersList');
+  if (!orders.length) { list.innerHTML = '<div style="text-align:center;color:var(--text-sec);padding:20px">Chưa có đơn</div>'; return; }
+  list.innerHTML = orders.map(o => `
+    <div class="list-item">
+      <div class="icon-box">${o.status === 'delivered' ? '✅' : o.status === 'cancelled' ? '❌' : '⏳'}</div>
+      <div class="info">
+        <div class="title">${o.pickup.name.split(',')[0]} → ${o.destination.name.split(',')[0]}</div>
+        <div class="subtitle">${o.service} • ${o.distanceKm.toFixed(1)} km • ${new Date(o.createdAt).toLocaleString('vi-VN')}</div>
+      </div>
+      <div class="value">${o.price.toLocaleString('vi-VN')}đ</div>
+    </div>`).join('');
+}
+
+/* ==========================================
+   WALLET
+   ========================================== */
+function renderWallet() {
+  const u = currentUser();
+  if (!u) return;
+  document.getElementById('walletBalance').textContent = u.balance.toLocaleString('vi-VN') + 'đ';
+
+  const db = DB();
+  const vouchers = db.vouchers.filter(v => v.active);
+  const vl = document.getElementById('voucherList');
+  if (!vouchers.length) vl.innerHTML = '<div style="text-align:center;color:var(--text-sec);padding:16px;font-size:13px">Không có voucher</div>';
+  else vl.innerHTML = vouchers.map(v => `
+    <div class="list-item">
+      <div class="icon-box" style="background:#FFF3E0;color:var(--warning)">🎁</div>
+      <div class="info"><div class="title">${v.code}</div><div class="subtitle">${v.type === 'percent' ? '-' + v.value + '%' : '-' + v.value.toLocaleString('vi-VN') + 'đ'}</div></div>
+    </div>`).join('');
+
+  const topups = db.topups.filter(t => t.userId === u.id).slice().reverse();
+  const tl = document.getElementById('topupHistory');
+  if (!topups.length) tl.innerHTML = '<div style="text-align:center;color:var(--text-sec);padding:16px;font-size:13px">Chưa có giao dịch</div>';
+  else tl.innerHTML = topups.map(t => {
+    const bg = t.status === 'approved' ? '#E8F5E9' : t.status === 'pending' ? '#FFF3E0' : '#FFEBEE';
+    const color = t.status === 'approved' ? 'var(--success)' : t.status === 'pending' ? 'var(--warning)' : 'var(--danger)';
+    const icon = t.status === 'approved' ? '✅' : t.status === 'pending' ? '⏳' : '❌';
+    return `<div class="list-item">
+      <div class="icon-box" style="background:${bg};color:${color}">${icon}</div>
+      <div class="info"><div class="title">Nạp ${t.amount.toLocaleString('vi-VN')}đ</div><div class="subtitle">${new Date(t.createdAt).toLocaleString('vi-VN')}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function openTopupModal() {
+  const db = DB();
+  const bank = db.config.bank;
+  openModal('Nạp tiền', `
+    <div style="background:#EAF7F0;padding:14px;border-radius:10px;margin-bottom:14px;font-size:13px">
+      <div><b>Ngân hàng:</b> Vietcombank</div>
+      <div><b>Số TK:</b> ${bank.account}</div>
+      <div><b>Chủ TK:</b> ${bank.owner}</div>
+    </div>
+    <div class="form-group"><label>Số tiền nạp (VNĐ)</label><input id="topupAmount" type="number" placeholder="VD: 100000"></div>
+    <div class="form-group"><label>Ghi chú</label><input id="topupNote" placeholder="VD: NAP TIEN"></div>
+    <div style="text-align:center;margin-top:12px">
+      <a class="zalo-btn" href="${bank.zaloUrl}" target="_blank">📱 Liên hệ Zalo xác nhận</a>
+    </div>
+  `, () => {
+    const amount = parseInt(document.getElementById('topupAmount').value);
+    const note = document.getElementById('topupNote').value.trim();
+    if (!amount || amount < 10000) { toast('Tối thiểu 10.000đ'); return; }
+    const u = currentUser();
+    const cur = DB(); cur.topups.push({ id: uid('T'), userId: u.id, amount, note, status: 'pending', createdAt: Date.now() });
+    DBSave(cur);
+    toast('Đã gửi yêu cầu — chờ duyệt');
+    closeModal();
+    renderWallet();
+  });
+}
+
+/* ==========================================
+   PROFILE
+   ========================================== */
+function renderProfile() {
+  const u = currentUser();
+  if (!u) return;
+  document.getElementById('profileAvatar').innerHTML = u.avatar ? `<img src="${u.avatar}">` : u.name[0];
+  document.getElementById('profileName').textContent = u.name;
+  document.getElementById('profilePhone').textContent = u.phone;
+  document.getElementById('profileVip').style.display = u.vip ? 'inline-block' : 'none';
+  document.getElementById('profileTrips').textContent = u.totalTrips || 0;
+  document.getElementById('profileSpent').textContent = (u.totalSpent || 0).toLocaleString('vi-VN') + 'đ';
+}
+
+/* ==========================================
+   CHAT
+   ========================================== */
+let activeChatId = null;
+
+function getMyChats() {
+  const u = currentUser();
+  if (!u) return {};
+  const db = DB();
+  const result = {};
+  Object.keys(db.chats || {}).forEach(orderId => {
+    const o = db.orders.find(x => x.id === orderId);
+    if (o && o.userId === u.id) result[orderId] = db.chats[orderId];
+  });
+  return result;
+}
+
+function renderChatList() {
+  const chats = getMyChats();
+  const entries = Object.entries(chats).filter(([k, v]) => v.length > 0);
+  const list = document.getElementById('chatList');
+  if (!entries.length) { list.innerHTML = '<div style="text-align:center;color:var(--text-sec);padding:20px">Chưa có tin nhắn</div>'; return; }
+  list.innerHTML = entries.map(([oid, msgs]) => {
+    const db = DB();
+    const o = db.orders.find(x => x.id === oid);
+    const last = msgs[msgs.length - 1];
+    const driverName = o && o.driver ? o.driver.name : 'Tài xế';
+    return `
+      <div class="list-item" onclick="openChatWith('${oid}')" style="cursor:pointer">
+        <div class="icon-box">💬</div>
+        <div class="info"><div class="title">${driverName}</div><div class="subtitle">${last.sender === 'customer' ? 'Bạn: ' : ''}${last.text}</div></div>
+      </div>`;
+  }).join('');
+}
+
+function openChatWith(orderId) {
+  activeChatId = orderId;
+  const db = DB();
+  const o = db.orders.find(x => x.id === orderId);
+  document.getElementById('chatName').textContent = o && o.driver ? o.driver.name : 'Tài xế';
+  document.getElementById('chatWindow').classList.add('active');
+  renderChatMessages();
+}
+
+function openDriverChat() {
+  if (window._activeOrderId) openChatWith(window._activeOrderId);
+}
+
+function closeChat() {
+  document.getElementById('chatWindow').classList.remove('active');
+  activeChatId = null;
+  renderChatList();
+}
+
+function renderChatMessages() {
+  if (!activeChatId) return;
+  const db = DB();
+  const msgs = db.chats[activeChatId] || [];
+  document.getElementById('chatMessages').innerHTML = msgs.map(m => `
+    <div class="msg-bubble ${m.sender === 'customer' ? 'outgoing' : 'incoming'}">${m.text}<div class="msg-time">${new Date(m.time).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}</div></div>`).join('');
+  const el = document.getElementById('chatMessages');
+  el.scrollTop = el.scrollHeight;
+}
+
+function sendMessage() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text || !activeChatId) return;
+  const u = currentUser();
+  const db = DB();
+  if (!db.chats[activeChatId]) db.chats[activeChatId] = [];
+  db.chats[activeChatId].push({ sender: 'customer', text, name: u.name, time: Date.now() });
+  DBSave(db);
+  inp.value = '';
+  renderChatMessages();
+}
+
+setInterval(() => { if (activeChatId) renderChatMessages(); }, 2000);
+
+/* ==========================================
+   MODAL BASE
+   ========================================== */
+function openModal(title, body, onConfirm) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = body;
+  const btn = document.getElementById('modalConfirm');
+  if (onConfirm) {
+    btn.style.display = 'block';
+    btn.onclick = onConfirm;
+  } else {
+    btn.style.display = 'none';
+  }
+  document.getElementById('modalOverlay').classList.add('active');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+
+/* ===== Giao hàng kiểu Ahamove: giá theo xe, cao điểm, hạng thành viên ===== */
+window._delivery = null;
+const esc = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const VEH = { moto: 'Xe máy', van: 'Van 500kg', truck: 'Tải 1 tấn' };
+function surgeActive() { const p = DB().config.pricing, h = new Date().getHours(); return !!p.surgeOn && p.peak.some(r => h >= r[0] && h < r[1]); }
+function tier() { const u = currentUser(), t = (u && u.totalSpent) || 0; return t >= 5e6 ? { n: 'Kim cương', disc: .06, i: '💎' } : t >= 2e6 ? { n: 'Vàng', disc: .04, i: '🥇' } : t >= 5e5 ? { n: 'Bạc', disc: .02, i: '🥈' } : { n: 'Đồng', disc: 0, i: '🥉' }; }
+function finalPrice(est, withTip) {
+  const pr = DB().config.pricing, v = (window._delivery && window._delivery.vehicle) || 'moto';
+  let p = est.price * (pr.vehicles[v] || 1);
+  if (surgeActive()) p *= pr.surgeMul;
+  p *= 1 - tier().disc;
+  p = Math.round(p / 1000) * 1000;
+  return p + (withTip && window._delivery ? window._delivery.tip || 0 : 0);
+}
+function paintDeliveryBtn() {
+  const b = document.getElementById('btnDelivery'); if (!b) return; const d = window._delivery;
+  b.innerHTML = (d ? `📦 ${esc(d.receiverName)} • ${VEH[d.vehicle]}${d.cod ? ' • COD ' + d.cod.toLocaleString('vi-VN') + 'đ' : ''}` : '📦 Thông tin giao hàng (tuỳ chọn)') + (surgeActive() ? ' 🔥 Cao điểm' : '');
+}
+document.getElementById('btnBook').insertAdjacentHTML('beforebegin', '<button id="btnDelivery" onclick="openDeliveryModal()" style="width:100%;padding:13px;margin-bottom:8px;border:none;border-radius:14px;background:#E3F5EC;color:#066B43;font-weight:700;font-size:13px;cursor:pointer"></button>');
+paintDeliveryBtn(); setInterval(paintDeliveryBtn, 60000);
+function openDeliveryModal() {
+  const u = currentUser(), d = window._delivery || {}, inp = 'style="margin-top:6px"';
+  openModal('📦 Thông tin giao hàng', `
+    <div class="form-group"><label>Loại xe</label><select id="dlVeh" style="width:100%;padding:12px;border:2px solid var(--border);border-radius:10px"><option value="moto">Xe máy (≤ 30kg)</option><option value="van">Van 500kg (x${DB().config.pricing.vehicles.van})</option><option value="truck">Tải 1 tấn (x${DB().config.pricing.vehicles.truck})</option></select></div>
+    <div class="form-group"><label>Người gửi (tên, SĐT)</label><input id="dlSN" value="${esc(d.senderName || u.name)}"><input id="dlSP" ${inp} value="${esc(d.senderPhone || u.phone)}"></div>
+    <div class="form-group"><label>Người nhận (tên, SĐT)</label><input id="dlRN" value="${esc(d.receiverName)}" placeholder="Tên người nhận"><input id="dlRP" ${inp} value="${esc(d.receiverPhone)}" placeholder="Số điện thoại" type="tel"></div>
+    <div class="form-group"><label>Hàng hoá</label><input id="dlItem" value="${esc(d.item)}" placeholder="VD: Quần áo, 2kg"></div>
+    <div class="form-group"><label>Thu hộ COD (đ)</label><input id="dlCod" type="number" value="${d.cod || ''}"></div>
+    <div class="form-group"><label>Tiền tip cho tài xế (đ)</label><input id="dlTip" type="number" value="${d.tip || ''}"></div>
+    <div class="form-group"><label>Ghi chú cho tài xế</label><input id="dlNote" value="${esc(d.note)}"></div>`, () => {
+    const g = id => document.getElementById(id).value.trim();
+    if (!g('dlRN') || !g('dlRP')) { toast('Nhập tên và SĐT người nhận'); return; }
+    window._delivery = { vehicle: g('dlVeh'), senderName: g('dlSN'), senderPhone: g('dlSP'), receiverName: g('dlRN'), receiverPhone: g('dlRP'), item: g('dlItem'), cod: parseInt(g('dlCod')) || 0, tip: parseInt(g('dlTip')) || 0, note: g('dlNote') };
+    closeModal(); paintDeliveryBtn(); if (pickup && destination) drawRoute(); toast('Đã lưu thông tin giao hàng');
+  });
+  document.getElementById('dlVeh').value = d.vehicle || 'moto';
+}
+const _rp = renderProfile;
+renderProfile = function () {
+  _rp(); let el = document.getElementById('tierBadge');
+  if (!el) { document.getElementById('profileName').insertAdjacentHTML('afterend', '<div id="tierBadge" style="display:inline-block;margin:0 0 10px;padding:6px 14px;border-radius:20px;background:#E3F5EC;color:#066B43;font-size:12px;font-weight:700"></div>'); el = document.getElementById('tierBadge'); }
+  const t = tier(); el.textContent = `${t.i} Hạng ${t.n}` + (t.disc ? ` • Giảm ${Math.round(t.disc * 100)}% mọi chuyến` : ' • Chi tiêu 500k để lên hạng Bạc');
+};
+
+/* ===== Đánh giá tài xế ===== */
+let rateStars = 5;
+function openRateModal(o) {
+  openModal('Đánh giá chuyến đi', `<div style="text-align:center;font-size:13px;color:var(--text-sec)">Tài xế ${o.driver ? o.driver.name : ''}</div>${o.proofPhoto ? `<img src="${o.proofPhoto}" style="width:100%;border-radius:12px;margin-top:8px">` : ''}
+    <div class="star-row" id="starRow">${[1,2,3,4,5].map(i => `<span onclick="setStars(${i})">★</span>`).join('')}</div>
+    <div class="form-group"><label>Nhận xét (không bắt buộc)</label><input id="rateNote" placeholder="Tài xế thân thiện, đúng giờ..."></div>`, () => submitRating(o));
+  setStars(5);
+}
+function setStars(n) { rateStars = n; document.querySelectorAll('#starRow span').forEach((s, i) => s.classList.toggle('on', i < n)); }
+function submitRating(o) {
+  const up = {}; up[`orders/${o.id}/rating`] = rateStars; up[`orders/${o.id}/ratingNote`] = document.getElementById('rateNote').value.trim();
+  if (o.driver) { up[`drivers/${o.driver.id}/ratingSum`] = inc(rateStars); up[`drivers/${o.driver.id}/ratingCount`] = inc(1); }
+  rootRef.update(up); toast('Cảm ơn bạn đã đánh giá ⭐'); closeModal();
+}
+function quickReply(t){const i=document.getElementById("chatInput");i.value=t;sendMessage();}
+
+/* ==========================================
+   BOOT + REALTIME
+   ========================================== */
+const refreshCustomer = debounce(() => {
+  if (document.getElementById('appView').style.display !== 'flex') return;
+  const u = currentUser();
+  if (!u) return;
+  renderProfile(); renderWallet(); renderOrders();
+  if (document.getElementById('page-chat').classList.contains('active')) renderChatList();
+}, 150);
+onDBChange(type => { if (type === 'change') refreshCustomer(); });
+dbReady.then(() => { const u = currentUser(); if (u) enterApp(u); });
+onDBChange((t, e) => { if (t === 'error' && window.__showErr) window.__showErr('Firebase: ' + ((e && e.message) || e)); });
+</script>
+</body>
+</html>

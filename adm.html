@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<script>
+(function(){var box;function show(m){if(!box){box=document.createElement('div');box.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#B42318;color:#fff;font:12px/1.4 monospace;padding:10px 12px;border-radius:12px;max-height:40vh;overflow:auto;white-space:pre-wrap';box.onclick=function(){box.style.display='none'};var add=function(){document.body.appendChild(box)};document.body?add():addEventListener('DOMContentLoaded',add)}box.style.display='block';box.textContent+=m+'\n\n(chạm để ẩn)\n\n'}
+window.__showErr=show;
+addEventListener('error',function(e){if(e.target&&e.target.src)show('Không tải được: '+e.target.src);else show('Lỗi: '+e.message+' ('+(e.filename||'').split('/').pop()+':'+e.lineno+')')},true);
+addEventListener('unhandledrejection',function(e){show('Lỗi: '+(e.reason&&e.reason.message||e.reason))});
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>UBGO - Admin Panel</title>
+<style>
+  :root { --primary:#0A8F5B; --success:#00C853; --danger:#FF3D00; --warning:#FFA000; --text:#1A1A1A; --text-sec:#8A8A8E; --bg:#F2F3F5; --card:#FFF; --border:#E5E5EA; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); height:100vh; overflow:hidden; display:flex; flex-direction:column; color:var(--text); }
+  
+  /* LOGIN */
+  #loginView { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; padding:20px; background:linear-gradient(135deg, #0A8F5B, #056B43); }
+  .login-box { background:var(--card); padding:30px 24px; border-radius:20px; width:100%; max-width:360px; box-shadow:0 10px 30px rgba(0,0,0,0.2); text-align:center; }
+  .login-box img { width:80px; height:80px; border-radius:20px; object-fit:cover; margin-bottom:16px; }
+  .login-box h1 { font-size:22px; margin-bottom:8px; font-weight:800; }
+  .login-box p { font-size:13px; color:var(--text-sec); margin-bottom:20px; }
+  .login-box input { width:100%; padding:14px; border:2px solid var(--border); border-radius:12px; font-size:15px; margin-bottom:12px; outline:none; text-align:center; }
+  .login-box input:focus { border-color:var(--primary); }
+  .login-box button { width:100%; padding:14px; background:var(--primary); color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; }
+
+  /* MAIN APP */
+  #appView { display:none; flex-direction:column; height:100vh; }
+  .status-bar { height:44px; background:#111; display:flex; align-items:center; justify-content:space-between; padding:0 20px; font-size:12px; font-weight:600; color:#fff; flex-shrink:0; }
+  .app-header { background:#111; padding:8px 20px 16px; display:flex; align-items:center; justify-content:space-between; color:#fff; flex-shrink:0; }
+  .app-header h2 { font-size:18px; font-weight:800; }
+  .logout-btn { background:rgba(255,255,255,0.1); border:none; color:#fff; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; }
+  
+  .main-content { flex:1; overflow-y:auto; padding-bottom:90px; }
+  .tab-page { display:none; animation:fadeIn 0.2s ease; }
+  .tab-page.active { display:block; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+  
+  .section { padding:16px; }
+  .section-title { font-size:16px; font-weight:800; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  
+  .card { background:var(--card); border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 2px 10px rgba(0,0,0,0.04); }
+  .card-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px dashed var(--border); padding-bottom:10px; }
+  .card-row:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+  .card-row .label { font-size:13px; color:var(--text-sec); }
+  .card-row .value { font-size:14px; font-weight:700; }
+  
+  .btn-sm { padding:8px 14px; border-radius:8px; border:none; font-size:12px; font-weight:700; cursor:pointer; }
+  .btn-primary { background:var(--primary); color:#fff; }
+  .btn-success { background:var(--success); color:#fff; }
+  .btn-danger { background:var(--danger); color:#fff; }
+  .btn-outline { background:transparent; border:1px solid var(--primary); color:var(--primary); }
+  
+  .tab-bar { height:70px; background:var(--card); display:flex; border-top:1px solid var(--border); flex-shrink:0; padding-bottom:env(safe-area-inset-bottom); }
+  .tab-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; color:var(--text-sec); font-size:10px; gap:4px; font-weight:600; }
+  .tab-item.active { color:var(--primary); }
+  .tab-item .icon { font-size:20px; }
+  
+  .list-item { background:#FAFBFC; border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:10px; display:flex; align-items:center; gap:12px; }
+  .list-item .avatar { width:44px; height:44px; border-radius:12px; background:#E3F5EC; color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; flex-shrink:0; overflow:hidden; }
+  .list-item .avatar img { width:100%; height:100%; object-fit:cover; }
+  .list-item .info { flex:1; min-width:0; }
+  .list-item .info h4 { font-size:14px; font-weight:700; margin-bottom:2px; }
+  .list-item .info p { font-size:12px; color:var(--text-sec); }
+  
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:2000; display:none; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.active { display:flex; }
+  .modal { background:var(--card); border-radius:20px; padding:24px; width:100%; max-width:400px; max-height:90vh; overflow-y:auto; }
+  .modal h3 { font-size:18px; margin-bottom:16px; font-weight:800; }
+  .form-group { margin-bottom:14px; }
+  .form-group label { display:block; font-size:12px; color:var(--text-sec); font-weight:600; margin-bottom:6px; }
+  .form-group input, .form-group select { width:100%; padding:12px; border:2px solid var(--border); border-radius:10px; font-size:14px; outline:none; }
+  .form-group input:focus { border-color:var(--primary); }
+  .modal .row { display:flex; gap:10px; margin-top:20px; }
+  .modal .btn { flex:1; padding:12px; border-radius:10px; border:none; font-size:14px; font-weight:700; cursor:pointer; }
+  .modal .btn-cancel { background:var(--bg); color:var(--text-sec); }
+  .modal .btn-confirm { background:var(--primary); color:#fff; }
+  
+  .toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#333; color:#fff; padding:12px 22px; border-radius:20px; font-size:13px; opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:9999; font-weight:600; }
+  .toast.show { opacity:1; }
+
+/* ===== UBGO theme v2 (thống nhất 3 app) ===== */
+:root{--primary:#0A8F5B;--success:#12B76A;--danger:#E5484D;--warning:#F59E0B;--text:#10231A;--text-sec:#6B7D74;--bg:#F3F6F4;--border:#E3EAE6;--ink:#0B1F17}
+*{font-family:'Be Vietnam Pro',-apple-system,'Segoe UI',Roboto,sans-serif!important}
+body{background:var(--bg)}
+.status-bar{background:var(--ink)!important;font-size:11px}
+.app-header{background:linear-gradient(160deg,#0B9D63,#066B43)!important;border-radius:0 0 28px 28px!important;box-shadow:0 10px 24px rgba(6,107,67,.25)}
+#loginView,#authView{background:radial-gradient(120% 80% at 20% 0%,#12B76A 0%,#066B43 55%,#0B1F17 100%)!important}
+.login-box,.auth-box{border-radius:28px!important;box-shadow:0 24px 60px rgba(0,0,0,.35)!important}
+.login-box button,.auth-box button,.btn-accept,.modal .btn-confirm,.btn.btn-primary{background:linear-gradient(135deg,#12B76A,#0A8F5B)!important;box-shadow:0 6px 16px rgba(10,143,91,.3)}
+.btn-reject{background:#EDF1EF!important}
+.card,.list-item,.stats,.profile-card,.menu-item,.chat-list-item{border-radius:20px!important;box-shadow:0 1px 2px rgba(11,31,23,.04),0 8px 24px rgba(11,31,23,.05)!important;border:none!important}
+.tab-bar{margin:0 12px calc(10px + env(safe-area-inset-bottom));border-radius:24px;height:66px!important;border:none!important;box-shadow:0 10px 32px rgba(11,31,23,.16);padding-bottom:0!important}
+.tab-item{position:relative;transition:color .2s}
+.tab-item.active::before{content:'';position:absolute;top:0;width:26px;height:3px;border-radius:0 0 4px 4px;background:var(--primary)}
+.tab-item.active .icon{transform:translateY(-2px) scale(1.08)}
+.bottom-panel{border-radius:28px 28px 0 0!important}
+.order-card{border-radius:20px!important;background:#fff!important;border:1px solid var(--border)!important}
+.order-card .price{font-size:26px!important;letter-spacing:-.5px}
+.wallet-card{background:linear-gradient(135deg,#0B9D63,#055C39)!important;border-radius:24px!important;box-shadow:0 14px 30px rgba(6,107,67,.3)!important}
+.wallet-card .btn-withdraw{color:#066B43!important}
+.stat .value{font-size:19px!important}
+.msg-bubble{border-radius:20px!important}
+.chat-messages{background:#E9F0EC!important}
+.toast{border-radius:16px!important;background:var(--ink)!important}
+/* thanh đếm ngược nhận đơn */
+.offer-timer{height:6px;border-radius:6px;background:#E3EAE6;overflow:hidden;margin-top:12px}
+.offer-timer i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#F59E0B,#E5484D);transition:width .1s linear}
+/* công cụ chuyến đi */
+.tool-row{display:flex;gap:8px;margin-top:10px}
+.tool-btn{flex:1;text-align:center;padding:11px 6px;border-radius:14px;background:#E3F5EC;color:#066B43;font-size:12px;font-weight:700;text-decoration:none;border:none;cursor:pointer}
+.quick-replies{display:flex;gap:8px;overflow-x:auto;padding:8px 14px;background:var(--card);border-top:1px solid var(--border)}
+.quick-replies button{flex-shrink:0;border:1px solid var(--border);background:#fff;border-radius:18px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer}
+/* biểu đồ 7 ngày */
+.week-chart{background:var(--card);border-radius:20px;padding:16px;margin-bottom:16px;box-shadow:0 8px 24px rgba(11,31,23,.05)}
+.wk-head{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--text-sec);font-weight:600}.wk-head b{font-size:18px;color:var(--text)}
+.wk-bars{display:flex;gap:8px;align-items:flex-end;height:96px;margin-top:14px}
+.wk-col{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;font-size:10px;color:var(--text-sec);font-weight:600}
+.wk-bar{width:100%;border-radius:8px 8px 4px 4px;background:#BFE8D3}.wk-bar.today{background:var(--primary)}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.mini{background:var(--card);border-radius:18px;padding:14px;box-shadow:0 8px 24px rgba(11,31,23,.05)}.mini b{display:block;font-size:22px}.mini span{font-size:11px;color:var(--text-sec);font-weight:600}
+/* đánh giá sao + gọi tài xế */
+.star-row{display:flex;justify-content:center;gap:6px;font-size:38px;margin:6px 0 14px}
+.star-row span{color:#D5DDD9;cursor:pointer}.star-row span.on{color:#FFB400}
+.call-btn{width:42px;height:42px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:18px;margin-left:auto}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- LOGIN VIEW -->
+<div id="loginView">
+  <div class="login-box">
+    <img src="https://i.ibb.co/DPbGZ7NG/logo.png" onerror="this.style.display='none'">
+    <h1>UBGO Admin</h1>
+    <p>Hệ thống quản trị - Bản quyền Thiên Khải</p>
+    <input id="adminUser" placeholder="Tên đăng nhập" autocomplete="off">
+    <input id="adminPass" type="password" placeholder="Mật khẩu" autocomplete="off">
+    <button onclick="doAdminLogin()">Đăng nhập</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appView">
+  <div class="status-bar">
+    <span id="clock">--:--</span>
+    <span id="netStatus">Admin Mode</span>
+  </div>
+  <div class="app-header">
+    <h2>👑 UBGO Admin</h2>
+    <button class="logout-btn" onclick="doAdminLogout()">Đăng xuất</button>
+  </div>
+
+  <div class="main-content">
+    <!-- DASHBOARD -->
+    <div class="tab-page active" id="page-home">
+      <div class="section">
+        <div class="section-title">📊 Thống kê hệ thống</div>
+        <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="text-align:center;padding:12px;background:#E3F5EC;border-radius:12px;">
+            <div style="font-size:22px;font-weight:800;color:var(--primary);" id="statUsers">0</div>
+            <div style="font-size:11px;color:var(--text-sec);font-weight:600;">Khách hàng</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:#E8F5E9;border-radius:12px;">
+            <div style="font-size:22px;font-weight:800;color:var(--success);" id="statDrivers">0</div>
+            <div style="font-size:11px;color:var(--text-sec);font-weight:600;">Tài xế</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:#FFF3E0;border-radius:12px;">
+            <div style="font-size:22px;font-weight:800;color:var(--warning);" id="statOrders">0</div>
+            <div style="font-size:11px;color:var(--text-sec);font-weight:600;">Tổng đơn</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:#FFEBEE;border-radius:12px;">
+            <div style="font-size:22px;font-weight:800;color:var(--danger);" id="statRevenue">0đ</div>
+            <div style="font-size:11px;color:var(--text-sec);font-weight:600;">Doanh thu</div>
+          </div>
+        </div>
+        <div id="adminExtra"></div>
+      </div>
+    </div>
+
+    <!-- USERS & DRIVERS -->
+    <div class="tab-page" id="page-users">
+      <div class="section">
+        <div class="section-title">🚗 Quản lý Tài xế <button class="btn-sm btn-primary" style="margin-left:auto;" onclick="openDriverModal()">+ Thêm</button></div>
+        <div id="driverList"></div>
+        
+        <div class="section-title" style="margin-top:24px;">👤 Danh sách Khách hàng</div>
+        <div id="userList"></div>
+      </div>
+    </div>
+
+    <!-- APPROVALS -->
+    <div class="tab-page" id="page-approvals">
+      <div class="section">
+        <div class="section-title">💰 Duyệt nạp tiền</div>
+        <div id="topupList"></div>
+        
+        <div class="section-title" style="margin-top:24px;">🏦 Duyệt rút tiền</div>
+        <div id="withdrawList"></div>
+      </div>
+    </div>
+
+    <!-- MARKETING -->
+    <div class="tab-page" id="page-marketing">
+      <div class="section">
+        <div class="section-title">🎁 Quản lý Voucher <button class="btn-sm btn-primary" style="margin-left:auto;" onclick="openVoucherModal()">+ Tạo</button></div>
+        <div id="voucherList"></div>
+        
+        <div class="section-title" style="margin-top:24px;">🎉 Sự kiện Tài xế <button class="btn-sm btn-primary" style="margin-left:auto;" onclick="openEventModal()">+ Tạo</button></div>
+        <div id="eventList"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="tab-page" id="page-settings">
+      <div class="section">
+        <div class="section-title">⚙️ Cấu hình Hệ thống</div>
+        <div class="card">
+          <div class="form-group">
+            <label>Logo URL</label>
+            <input id="cfgLogo">
+          </div>
+          <div class="form-group">
+            <label>Số tài khoản nhận tiền (Vietcombank)</label>
+            <input id="cfgAccount">
+          </div>
+          <div class="form-group">
+            <label>Chủ tài khoản</label>
+            <input id="cfgOwner">
+          </div>
+          <div class="form-group">
+            <label>Số Zalo liên hệ</label>
+            <input id="cfgZalo">
+          </div>
+          <div class="form-group">
+            <label>Link Zalo (dạng https://zalo.me/...)</label>
+            <input id="cfgZaloUrl">
+          </div>
+          <div class="form-group">
+            <label>Ngưỡng nạp VIP (VNĐ)</label>
+            <input id="cfgVip" type="number">
+          </div>
+          <div class="form-group"><label>Hệ số giá giờ cao điểm (11-13h, 17-19h)</label><input id="cfgSurge" type="number" step="0.1"></div>
+          <div class="form-group"><label>Thưởng tài xế mỗi chuyến cao điểm (VNĐ)</label><input id="cfgBonus" type="number"></div>
+          <div class="form-group"><label>Hệ số giá xe Van</label><input id="cfgVan" type="number" step="0.1"></div>
+          <div class="form-group"><label>Hệ số giá xe Tải</label><input id="cfgTruck" type="number" step="0.1"></div>
+          <button class="btn-sm btn-primary" style="width:100%;padding:12px;font-size:14px;margin-top:10px;" onclick="saveSettings()">Lưu cấu hình</button>
+        </div>
+        <div style="text-align:center; margin-top:20px; font-size:12px; color:var(--text-sec);">
+          Bản quyền © 2026 Thiên Khải
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <div class="tab-item active" data-tab="home" onclick="switchTab('home')"><div class="icon">📊</div><div>Tổng quan</div></div>
+    <div class="tab-item" data-tab="users" onclick="switchTab('users')"><div class="icon">👥</div><div>Thành viên</div></div>
+    <div class="tab-item" data-tab="approvals" onclick="switchTab('approvals')"><div class="icon">💳</div><div>Duyệt tiền</div></div>
+    <div class="tab-item" data-tab="marketing" onclick="switchTab('marketing')"><div class="icon">🎁</div><div>Ưu đãi</div></div>
+    <div class="tab-item" data-tab="settings" onclick="switchTab('settings')"><div class="icon">⚙️</div><div>Cài đặt</div></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Tiêu đề</h3>
+    <div id="modalBody"></div>
+    <div class="row">
+      <button class="btn btn-cancel" onclick="closeModal()">Hủy</button>
+      <button class="btn btn-confirm" id="modalConfirm">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ==========================================
+// UBGO CORE — Firebase Realtime DB (dùng chung cho cả 3 app: adm / khachh / taix)
+// Giữ nguyên API cũ: DB() đọc đồng bộ từ cache realtime, DBSave() chỉ ghi phần thay đổi.
+// ==========================================
+const FIREBASE_URL = 'https://uongbigo-default-rtdb.asia-southeast1.firebasedatabase.app';
+const COLLS = ['users','drivers','orders','vouchers','events','topups','withdraws','transactions'];
+const DELTA = new Set(['balance','totalTrips','totalSpent']); // số liệu cộng/trừ → ghi bằng increment để không bị ghi đè
+const DEFAULT_CONFIG = {
+  bank: { bankId:'vietcombank', account:'1339466041', owner:'PHAM TRAN THIEN KHAI', zalo:'0339466041', zaloUrl:'https://zalo.me/0339466041' },
+  logo: 'https://i.ibb.co/DPbGZ7NG/logo.png',
+  vipThreshold: 1000000, minWithdraw: 10000, copyright: 'Thiên Khải',
+  pricing: { surgeOn: true, surgeMul: 1.2, peak: [[11, 13], [17, 19]], peakBonus: 5000, vehicles: { moto: 1, van: 2.2, truck: 3.5 } }
+};
+
+firebase.initializeApp({ databaseURL: FIREBASE_URL });
+const rootRef = firebase.database().ref();
+const inc = n => firebase.database.ServerValue.increment(n);
+
+let remote = {}, cache = emptyCache(), base = clone(cache), synced = false;
+const listeners = [];
+function emptyCache() { const c = { chats: {}, config: clone(DEFAULT_CONFIG) }; COLLS.forEach(k => c[k] = []); return c; }
+function clone(x) { return JSON.parse(JSON.stringify(x)); }
+function ss(v) { // stringify ổn định (sắp xếp key) để so sánh
+  if (v === undefined) return 'u';
+  if (v && typeof v === 'object') return Array.isArray(v) ? '[' + v.map(ss).join(',') + ']' : '{' + Object.keys(v).sort().map(k => k + ':' + ss(v[k])).join(',') + '}';
+  return JSON.stringify(v);
+}
+function toList(x) { if (x == null) return []; if (Array.isArray(x)) return x; return Object.keys(x).sort((a, b) => a - b).map(k => x[k]); }
+function normItem(c, k, v) {
+  const o = { ...v, id: k };
+  if (c === 'users') { o.addresses = toList(o.addresses); o.vouchersUsed = toList(o.vouchersUsed); }
+  if (c === 'orders' && o.routeGeometry) o.routeGeometry = toList(o.routeGeometry).map(toList);
+  return o;
+}
+function rebuild() {
+  COLLS.forEach(c => {
+    cache[c] = Object.entries(remote[c] || {}).filter(([, v]) => v && typeof v === 'object')
+      .map(([k, v]) => normItem(c, k, v)).sort((a, b) => (a.createdAt || a.time || 0) - (b.createdAt || b.time || 0));
+  });
+  cache.chats = {};
+  Object.entries(remote.chats || {}).forEach(([oid, msgs]) => {
+    cache.chats[oid] = Object.entries(msgs || {}).map(([k, m]) => ({ ...m, id: k })).sort((a, b) => (a.time || 0) - (b.time || 0));
+  });
+  const rc = remote.config || {};
+  cache.config = { ...DEFAULT_CONFIG, ...rc, bank: { ...DEFAULT_CONFIG.bank, ...(rc.bank || {}) },
+    pricing: { ...DEFAULT_CONFIG.pricing, ...(rc.pricing || {}), vehicles: { ...DEFAULT_CONFIG.pricing.vehicles, ...((rc.pricing || {}).vehicles || {}) } } };
+  base = clone(cache);
+}
+
+// ---- Đọc / ghi ----
+function DB() { return cache; }
+function uid(prefix) { return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
+
+function diff(data) {
+  const u = {};
+  COLLS.forEach(c => {
+    const was = new Map((base[c] || []).map(x => [x.id, x]));
+    const now = new Map();
+    (data[c] || []).forEach(x => { if (!x.id) x.id = uid(c[0].toUpperCase()); now.set(x.id, x); });
+    now.forEach((item, id) => {
+      const old = was.get(id);
+      if (!old) { u[`${c}/${id}`] = item; return; }
+      new Set([...Object.keys(old), ...Object.keys(item)]).forEach(k => {
+        if (k === 'id' || ss(old[k]) === ss(item[k])) return;
+        if (DELTA.has(k) && typeof item[k] === 'number' && typeof old[k] === 'number') u[`${c}/${id}/${k}`] = inc(item[k] - old[k]);
+        else u[`${c}/${id}/${k}`] = item[k] === undefined ? null : item[k];
+      });
+    });
+    was.forEach((_, id) => { if (!now.has(id)) u[`${c}/${id}`] = null; });
+  });
+  Object.entries(data.chats || {}).forEach(([oid, msgs]) => {
+    const known = new Set((base.chats[oid] || []).map(m => m.id));
+    msgs.forEach(m => { if (!m.id) m.id = uid('M'); if (!known.has(m.id)) u[`chats/${oid}/${m.id}`] = m; });
+  });
+  Object.keys(data.config || {}).forEach(k => { if (ss(data.config[k]) !== ss(base.config[k])) u[`config/${k}`] = data.config[k]; });
+  return u;
+}
+function DBSave(data) {
+  const u = diff(data || cache);
+  base = clone(data || cache);
+  if (!Object.keys(u).length) return Promise.resolve();
+  return rootRef.update(u).catch(err => { console.error(err); notify('error', err); });
+}
+
+// ---- Giao dịch nguyên tử (chống 2 tài xế nhận cùng 1 đơn, duyệt 2 lần…) ----
+async function claim(path, from, to) {
+  const r = await rootRef.child(path).transaction(cur => cur === from ? to : undefined);
+  return r.committed;
+}
+async function acceptOrder(orderId, driverId) {
+  const o = cache.orders.find(x => x.id === orderId), d = cache.drivers.find(x => x.id === driverId);
+  if (!o || !d) return { ok: false, error: 'Không tìm thấy' };
+  if (!(await claim(`orders/${orderId}/status`, 'pending', 'accepted'))) return { ok: false, error: 'Đơn đã có người nhận hoặc đã bị hủy' };
+  const driver = { id: d.id, name: d.name, vehicle: d.vehicle, plate: d.plate, phone: d.phone, avatar: d.avatar || '' };
+  await rootRef.child(`orders/${orderId}`).update({ driver, acceptedAt: Date.now() });
+  return { ok: true, order: { ...o, status: 'accepted', driver } };
+}
+async function cancelOrder(orderId) { return claim(`orders/${orderId}/status`, 'pending', 'cancelled'); }
+function setOrderStatus(orderId, status, patch = {}) { return rootRef.child(`orders/${orderId}`).update({ status, ...patch }); }
+function confirmOrderTwoWay(orderId, who) { // mỗi bên chỉ ghi cờ của mình; hoàn tất do finalizeDeliveries()
+  return rootRef.child(`orders/${orderId}/${who === 'customer' ? 'customerConfirmed' : 'driverConfirmed'}`).set(true);
+}
+const finalizing = new Set();
+async function finalizeDeliveries() {
+  for (const o of cache.orders) {
+    if (o.status !== 'delivering' || !o.customerConfirmed || !o.driverConfirmed || finalizing.has(o.id)) continue;
+    finalizing.add(o.id);
+    try {
+      if (!(await claim(`orders/${o.id}/status`, 'delivering', 'delivered'))) continue; // máy khác đã chốt
+      const t = Date.now(), up = {};
+      up[`orders/${o.id}/deliveredAt`] = t;
+      if (o.driver) {
+        const tx = uid('TX');
+        const bonus = o.surge ? (cache.config.pricing.peakBonus || 0) : 0;
+        up[`drivers/${o.driver.id}/balance`] = inc(o.price + bonus);
+        if (bonus) { const bt = uid('TX'); up[`transactions/${bt}`] = { id: bt, type: 'bonus', driverId: o.driver.id, amount: bonus, orderId: o.id, time: t, createdAt: t }; }
+        if (o.delivery && o.delivery.cod) up[`drivers/${o.driver.id}/codHolding`] = inc(o.delivery.cod);
+        up[`drivers/${o.driver.id}/totalTrips`] = inc(1);
+        up[`transactions/${tx}`] = { id: tx, type: 'earn', driverId: o.driver.id, amount: o.price, orderId: o.id, time: t, createdAt: t };
+      }
+      if (o.userId) { up[`users/${o.userId}/totalTrips`] = inc(1); up[`users/${o.userId}/totalSpent`] = inc(o.price); }
+      await rootRef.update(up);
+    } catch (e) { console.error(e); finalizing.delete(o.id); }
+  }
+}
+
+// ---- Phiên đăng nhập: lưu riêng từng thiết bị (không dùng chung qua DB) ----
+const Sess = {
+  get: k => { try { return localStorage.getItem('ubgo_sess_' + k) || null; } catch { return null; } },
+  set: (k, v) => { try { v == null ? localStorage.removeItem('ubgo_sess_' + k) : localStorage.setItem('ubgo_sess_' + k, v); } catch {} }
+};
+
+// ---- Sự kiện realtime + trạng thái kết nối ----
+function notify(type, payload) { listeners.forEach(fn => { try { fn(type, payload); } catch (e) { console.error(e); } }); }
+function onDBChange(fn) { listeners.push(fn); }
+let connected = false;
+function paintNet() {
+  const el = document.getElementById('netStatus');
+  if (el) el.innerHTML = connected ? '<span style="color:#7CFFB0">●</span> Đã kết nối' : '<span style="color:#FFB74D">●</span> Đang kết nối...';
+}
+document.addEventListener('DOMContentLoaded', paintNet);
+firebase.database().ref('.info/connected').on('value', s => { connected = !!s.val(); paintNet(); });
+
+let _resolveReady; const dbReady = new Promise(r => _resolveReady = r);
+setTimeout(() => _resolveReady(), 6000); // mạng chậm vẫn mở được app
+rootRef.on('value', snap => {
+  remote = snap.val() || {};
+  if (!synced) { synced = true; if (!remote.config) rootRef.child('config').set(DEFAULT_CONFIG); }
+  rebuild(); _resolveReady();
+  finalizeDeliveries();
+  notify('change');
+}, err => { console.error(err); notify('error', err); _resolveReady(); });
+
+function haversineKm(a, b) {
+  const R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+  const s1 = Math.sin(dLat / 2), s2 = Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(s1 * s1 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * s2 * s2));
+}
+function debounce(fn, ms) { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+const ADMIN_USER = '28022007';
+const ADMIN_PASS = '260906';
+
+function loginAdmin(username, password) {
+  if (username === ADMIN_USER && password === ADMIN_PASS) { Sess.set('admin', '1'); return true; }
+  return false;
+}
+function logoutAdmin() { Sess.set('admin', null); }
+
+function createDriver(payload) {
+  const db = DB();
+  if (db.drivers.find(d => d.username === payload.username)) return { ok: false, error: 'Tên đăng nhập đã tồn tại' };
+  const d = {
+    id: uid('D'), username: payload.username, password: payload.password || '12345678',
+    name: payload.name, phone: payload.phone, vehicle: payload.vehicle, plate: payload.plate,
+    avatar: payload.avatar || '', status: 'active', balance: 0,
+    location: { lat: 20.9435, lng: 106.7898 }, online: false, rating: 5.0, totalTrips: 0,
+    createdAt: Date.now()
+  };
+  db.drivers.push(d); DBSave(db); return { ok: true, driver: d };
+}
+function updateDriver(id, patch) {
+  const db = DB(); const idx = db.drivers.findIndex(d => d.id === id);
+  if (idx !== -1) { db.drivers[idx] = { ...db.drivers[idx], ...patch }; DBSave(db); }
+}
+function updateUser(id, patch) {
+  const db = DB(); const idx = db.users.findIndex(u => u.id === id);
+  if (idx !== -1) { db.users[idx] = { ...db.users[idx], ...patch }; DBSave(db); }
+}
+async function approveTopup(id) {
+  const t = DB().topups.find(x => x.id === id);
+  if (!t) return false;
+  if (!(await claim(`topups/${id}/status`, 'pending', 'approved'))) return false; // chống duyệt 2 lần
+  const u = DB().users.find(x => x.id === t.userId);
+  const up = { [`topups/${id}/approvedAt`]: Date.now() };
+  if (u) {
+    up[`users/${u.id}/balance`] = inc(t.amount);
+    if ((u.balance || 0) + t.amount >= DB().config.vipThreshold) up[`users/${u.id}/vip`] = true;
+  }
+  await rootRef.update(up); return true;
+}
+async function rejectTopup(id) { return claim(`topups/${id}/status`, 'pending', 'rejected').then(ok => { if (ok) rootRef.child(`topups/${id}/rejectedAt`).set(Date.now()); return ok; }); }
+async function approveWithdraw(id) {
+  if (await claim(`withdraws/${id}/status`, 'pending', 'approved')) await rootRef.child(`withdraws/${id}/approvedAt`).set(Date.now());
+}
+function createVoucher(data) {
+  const db = DB();
+  db.vouchers.push({ id: uid('V'), ...data, active: true, createdAt: Date.now() });
+  DBSave(db);
+}
+function createEvent(data) {
+  const db = DB();
+  db.events.push({ id: uid('E'), ...data, active: true, createdAt: Date.now() });
+  DBSave(db);
+}
+
+// ==========================================
+// LOGIC UI ADMIN
+// ==========================================
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function updateClock(){const n=new Date();document.getElementById('clock').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
+updateClock(); setInterval(updateClock, 30000);
+
+function enterAdmin() {
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('appView').style.display = 'flex';
+  renderAll();
+}
+function doAdminLogin() {
+  const u = document.getElementById('adminUser').value.trim();
+  const p = document.getElementById('adminPass').value;
+  if (loginAdmin(u, p)) {
+    enterAdmin();
+  } else {
+    toast('Sai tài khoản hoặc mật khẩu');
+  }
+}
+function doAdminLogout() {
+  logoutAdmin(); location.reload();
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab-item[data-tab="${tab}"]`).classList.add('active');
+  if (tab === 'users') renderMembers();
+  if (tab === 'approvals') renderApprovals();
+  if (tab === 'marketing') renderMarketing();
+  if (tab === 'settings') loadSettings();
+}
+
+function renderAll() {
+  const db = DB();
+  document.getElementById('statUsers').textContent = db.users.length;
+  document.getElementById('statDrivers').textContent = db.drivers.length;
+  document.getElementById('statOrders').textContent = db.orders.length;
+  const rev = db.orders.filter(o => o.status === 'delivered' || o.status === 'completed').reduce((s,o)=>s+o.price,0);
+  document.getElementById('statRevenue').textContent = rev.toLocaleString('vi-VN') + 'đ';
+}
+
+function renderMembers() {
+  const db = DB();
+  const dl = document.getElementById('driverList');
+  if (!db.drivers.length) dl.innerHTML = '<div style="text-align:center;color:var(--text-sec);font-size:13px;padding:20px;">Chưa có tài xế</div>';
+  else dl.innerHTML = db.drivers.map(d => `
+    <div class="list-item">
+      <div class="avatar">${d.avatar ? `<img src="${d.avatar}">` : d.name[0]}</div>
+      <div class="info">
+        <h4>${d.name}</h4>
+        <p>${d.plate} • ${d.phone}</p>${d.codHolding ? `<p style="color:var(--danger);font-weight:700">COD đang giữ: ${d.codHolding.toLocaleString('vi-VN')}đ <a onclick="settleCod('${d.id}')" style="color:var(--primary);cursor:pointer">[Đã thu]</a></p>` : ''}
+        <p style="color:${d.status==='active'?'var(--success)':'var(--danger)'};font-weight:700;margin-top:2px;">${d.status==='active'?'Hoạt động':'Bị khóa'}</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button class="btn-sm btn-outline" onclick="openDriverModal('${d.id}')">Sửa</button>
+        <button class="btn-sm ${d.status==='active'?'btn-danger':'btn-success'}" onclick="toggleDriverStatus('${d.id}')">${d.status==='active'?'Khóa':'Mở'}</button>
+      </div>
+    </div>
+  `).join('');
+
+  const ul = document.getElementById('userList');
+  if (!db.users.length) ul.innerHTML = '<div style="text-align:center;color:var(--text-sec);font-size:13px;padding:20px;">Chưa có khách hàng</div>';
+  else ul.innerHTML = db.users.map(u => `
+    <div class="list-item">
+      <div class="avatar">${u.avatar ? `<img src="${u.avatar}">` : u.name[0]}</div>
+      <div class="info">
+        <h4>${u.name} ${u.vip ? '👑' : ''}</h4>
+        <p>${u.phone} • Số dư: ${u.balance.toLocaleString('vi-VN')}đ</p>
+      </div>
+    </div>
+  `).join('');
+}
+
+function settleCod(id) { const db = DB(), d = db.drivers.find(x => x.id === id); if (d) { d.codHolding = 0; DBSave(db); renderMembers(); toast('Đã thu COD'); } }
+function toggleDriverStatus(id) {
+  const db = DB(); const d = db.drivers.find(x => x.id === id);
+  if (d) { d.status = d.status === 'active' ? 'blocked' : 'active'; DBSave(db); renderMembers(); }
+}
+function currentAdminTab() { const t = document.querySelector('.tab-item.active'); return t ? t.dataset.tab : 'home'; }
+
+function renderApprovals() {
+  const db = DB();
+  const tl = document.getElementById('topupList');
+  const pendingTopups = db.topups.filter(t => t.status === 'pending');
+  if (!pendingTopups.length) tl.innerHTML = '<div style="text-align:center;color:var(--text-sec);font-size:13px;padding:20px;">Không có yêu cầu nạp</div>';
+  else tl.innerHTML = pendingTopups.map(t => {
+    const u = db.users.find(x => x.id === t.userId);
+    return `
+      <div class="card">
+        <div class="card-row"><span class="label">Khách hàng</span><span class="value">${u?u.name:'N/A'}</span></div>
+        <div class="card-row"><span class="label">Số tiền</span><span class="value" style="color:var(--primary);">${t.amount.toLocaleString('vi-VN')}đ</span></div>
+        <div class="card-row"><span class="label">Ghi chú</span><span class="value">${t.note || 'Không'}</span></div>
+        <div style="display:flex;gap:10px;margin-top:12px;">
+          <button class="btn-sm btn-danger" style="flex:1;" onclick="rejectTopupItem('${t.id}')">Từ chối</button>
+          <button class="btn-sm btn-success" style="flex:1;" onclick="approveTopupItem('${t.id}')">Duyệt</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  const wl = document.getElementById('withdrawList');
+  const pendingW = db.withdraws.filter(w => w.status === 'pending');
+  if (!pendingW.length) wl.innerHTML = '<div style="text-align:center;color:var(--text-sec);font-size:13px;padding:20px;">Không có yêu cầu rút</div>';
+  else wl.innerHTML = pendingW.map(w => {
+    const d = db.drivers.find(x => x.id === w.driverId);
+    return `
+      <div class="card">
+        <div class="card-row"><span class="label">Tài xế</span><span class="value">${d?d.name:'N/A'} (${d?d.plate:''})</span></div>
+        <div class="card-row"><span class="label">Số tiền</span><span class="value" style="color:var(--danger);">${w.amount.toLocaleString('vi-VN')}đ</span></div>
+        <div style="display:flex;gap:10px;margin-top:12px;">
+          <button class="btn-sm btn-success" style="flex:1;" onclick="approveWithdrawItem('${w.id}')">Đã chuyển khoản</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function approveTopupItem(id) { const ok = await approveTopup(id); toast(ok ? 'Đã duyệt nạp' : 'Yêu cầu đã được xử lý'); renderApprovals(); renderAll(); }
+async function rejectTopupItem(id) { await rejectTopup(id); toast('Đã từ chối'); renderApprovals(); }
+async function approveWithdrawItem(id) { await approveWithdraw(id); toast('Đã duyệt rút'); renderApprovals(); }
+
+function renderMarketing() {
+  const db = DB();
+  const vl = document.getElementById('voucherList');
+  if (!db.vouchers.length) vl.innerHTML = '<div style="text-align:center;color:var(--text-sec);font-size:13px;padding:20px;">Chưa có voucher</div>';
+  else vl.innerHTML = db.vouchers.map(v => `
+    <div class="list-item">
+      <div class="avatar" style="background:#FFF3E0;color:var(--warning);">🎁</div>
+      <div class="info">
+        <h4>${v.code}</h4>
+        <p>${v.type === 'percent' ? 'Giảm ' + v.value + '%' : 'Giảm ' + v.value.toLocaleString('vi-VN') + 'đ'}</p>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:${v.active?'var(--success)':'var(--danger)'};">${v.active?'Đang chạy':'Đã tắt'}</div>
+    </div>
+  `).join('');
+
+  const el = document.getElementById('eventList');
+  if (!db.events.length) el.innerHTML = '<div style="text-align:center;color:var(--text-sec);font-size:13px;padding:20px;">Chưa có sự kiện</div>';
+  else el.innerHTML = db.events.map(e => `
+    <div class="list-item">
+      <div class="avatar" style="background:#E8F5E9;color:var(--success);">🎉</div>
+      <div class="info">
+        <h4>${e.title}</h4>
+        <p>${e.description || ''}</p>
+        <p style="color:var(--primary);font-weight:700;margin-top:2px;">Thưởng: ${e.bonus.toLocaleString('vi-VN')}đ</p>
+      </div>
+    </div>
+  `).join('');
+}
+
+function loadSettings() {
+  const db = DB();
+  document.getElementById('cfgLogo').value = db.config.logo;
+  document.getElementById('cfgAccount').value = db.config.bank.account;
+  document.getElementById('cfgOwner').value = db.config.bank.owner;
+  document.getElementById('cfgZalo').value = db.config.bank.zalo;
+  document.getElementById('cfgZaloUrl').value = db.config.bank.zaloUrl;
+  document.getElementById('cfgVip').value = db.config.vipThreshold;
+  const pr = db.config.pricing; cfgSurge.value = pr.surgeMul; cfgBonus.value = pr.peakBonus; cfgVan.value = pr.vehicles.van; cfgTruck.value = pr.vehicles.truck;
+}
+function saveSettings() {
+  const db = DB();
+  db.config.logo = document.getElementById('cfgLogo').value.trim();
+  db.config.bank.account = document.getElementById('cfgAccount').value.trim();
+  db.config.bank.owner = document.getElementById('cfgOwner').value.trim();
+  db.config.bank.zalo = document.getElementById('cfgZalo').value.trim();
+  db.config.bank.zaloUrl = document.getElementById('cfgZaloUrl').value.trim();
+  db.config.vipThreshold = parseInt(document.getElementById('cfgVip').value) || 1000000;
+  db.config.pricing = { ...db.config.pricing, surgeMul: parseFloat(cfgSurge.value) || 1, peakBonus: parseInt(cfgBonus.value) || 0, vehicles: { moto: 1, van: parseFloat(cfgVan.value) || 2.2, truck: parseFloat(cfgTruck.value) || 3.5 } };
+  DBSave(db);
+  toast('Đã lưu cấu hình');
+}
+
+// MODAL DRIVER
+function openDriverModal(id) {
+  const db = DB();
+  const d = id ? db.drivers.find(x => x.id === id) : null;
+  const body = `
+    <div class="form-group"><label>Tên đăng nhập</label><input id="dUser" value="${d?d.username:''}" ${d?'disabled':''}></div>
+    <div class="form-group"><label>Mật khẩu</label><input id="dPass" type="password" value="${d?d.password:''}"></div>
+    <div class="form-group"><label>Họ tên</label><input id="dName" value="${d?d.name:''}"></div>
+    <div class="form-group"><label>Số điện thoại</label><input id="dPhone" value="${d?d.phone:''}"></div>
+    <div class="form-group"><label>Loại xe</label><input id="dVehicle" value="${d?d.vehicle:''}"></div>
+    <div class="form-group"><label>Biển số</label><input id="dPlate" value="${d?d.plate:''}"></div>
+    <div class="form-group"><label>Ảnh đại diện (URL)</label><input id="dAvatar" value="${d?d.avatar:''}"></div>
+  `;
+  openModal(d ? 'Sửa Tài xế' : 'Thêm Tài xế', body, () => {
+    const payload = {
+      username: document.getElementById('dUser').value.trim(),
+      password: document.getElementById('dPass').value,
+      name: document.getElementById('dName').value.trim(),
+      phone: document.getElementById('dPhone').value.trim(),
+      vehicle: document.getElementById('dVehicle').value.trim(),
+      plate: document.getElementById('dPlate').value.trim(),
+      avatar: document.getElementById('dAvatar').value.trim()
+    };
+    if (d) {
+      updateDriver(d.id, payload);
+      toast('Đã cập nhật');
+    } else {
+      const r = createDriver(payload);
+      if (!r.ok) { toast(r.error); return; }
+      toast('Đã thêm tài xế');
+    }
+    closeModal();
+    renderMembers();
+    renderAll();
+  });
+}
+
+// MODAL VOUCHER
+function openVoucherModal() {
+  const body = `
+    <div class="form-group"><label>Mã code</label><input id="vCode" placeholder="VD: UBGO50"></div>
+    <div class="form-group"><label>Loại</label><select id="vType"><option value="percent">Giảm %</option><option value="amount">Giảm tiền mặt</option></select></div>
+    <div class="form-group"><label>Giá trị</label><input id="vValue" type="number" placeholder="VD: 20 (nếu %) hoặc 20000"></div>
+    <div class="form-group"><label>Mô tả</label><input id="vDesc" placeholder="Mô tả ngắn"></div>
+  `;
+  openModal('Tạo Voucher', body, () => {
+    const code = document.getElementById('vCode').value.trim().toUpperCase();
+    const type = document.getElementById('vType').value;
+    const value = parseInt(document.getElementById('vValue').value);
+    const description = document.getElementById('vDesc').value.trim();
+    if (!code || !value) { toast('Nhập đủ thông tin'); return; }
+    createVoucher({ code, type, value, description });
+    toast('Đã tạo voucher');
+    closeModal();
+    renderMarketing();
+  });
+}
+
+// MODAL EVENT
+function openEventModal() {
+  const body = `
+    <div class="form-group"><label>Tên sự kiện</label><input id="eTitle" placeholder="VD: Thưởng cuối tuần"></div>
+    <div class="form-group"><label>Mô tả</label><input id="eDesc"></div>
+    <div class="form-group"><label>Thưởng (VNĐ)</label><input id="eBonus" type="number" placeholder="VD: 50000"></div>
+  `;
+  openModal('Tạo Sự kiện', body, () => {
+    const title = document.getElementById('eTitle').value.trim();
+    const description = document.getElementById('eDesc').value.trim();
+    const bonus = parseInt(document.getElementById('eBonus').value);
+    if (!title || !bonus) { toast('Nhập đủ thông tin'); return; }
+    createEvent({ title, description, bonus });
+    toast('Đã tạo sự kiện');
+    closeModal();
+    renderMarketing();
+  });
+}
+
+// MODAL BASE
+function openModal(title, body, onConfirm) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = body;
+  const btn = document.getElementById('modalConfirm');
+  btn.onclick = onConfirm;
+  document.getElementById('modalOverlay').classList.add('active');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+
+function renderExtra() {
+  const db = DB(), el = document.getElementById('adminExtra'); if (!el) return;
+  const online = db.drivers.filter(d => d.online && d.status === 'active').length;
+  const pend = db.topups.filter(t => t.status === 'pending').length + db.withdraws.filter(w => w.status === 'pending').length;
+  const active = db.orders.filter(o => ['pending', 'accepted', 'picked_up', 'delivering'].includes(o.status)).length;
+  const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - i)); return d; });
+  const sums = days.map(d => db.orders.filter(o => o.status === 'delivered' && (o.deliveredAt || o.createdAt) >= d.getTime() && (o.deliveredAt || o.createdAt) < d.getTime() + 864e5).reduce((a, o) => a + o.price, 0));
+  const max = Math.max(...sums, 1);
+  const top = db.drivers.slice().sort((a, b) => (b.totalTrips || 0) - (a.totalTrips || 0)).slice(0, 3);
+  el.innerHTML = `<div class="mini-grid"><div class="mini"><b>${online}</b><span>Tài xế đang online</span></div><div class="mini"><b>${active}</b><span>Chuyến đang chạy</span></div>
+    <div class="mini" onclick="switchTab('approvals')" style="cursor:pointer"><b style="color:${pend ? 'var(--danger)' : 'inherit'}">${pend}</b><span>Yêu cầu chờ duyệt</span></div><div class="mini"><b>${db.vouchers.filter(v => v.active).length}</b><span>Voucher đang chạy</span></div></div>
+    <div class="week-chart" style="margin-top:14px"><div class="wk-head"><span>Doanh thu 7 ngày</span><b>${sums.reduce((a, b) => a + b, 0).toLocaleString('vi-VN')}đ</b></div><div class="wk-bars">${sums.map((v, i) => `<div class="wk-col"><div class="wk-bar ${i === 6 ? 'today' : ''}" style="height:${Math.max(4, v / max * 100)}%"></div><span>${['CN','T2','T3','T4','T5','T6','T7'][days[i].getDay()]}</span></div>`).join('')}</div></div>
+    <div class="section-title" style="margin-top:6px">🏆 Tài xế nổi bật</div>${top.map(d => `<div class="list-item"><div class="avatar">${d.name[0]}</div><div class="info"><h4>${d.name}</h4><p>${d.totalTrips || 0} chuyến • ⭐ ${(d.ratingCount ? d.ratingSum / d.ratingCount : 5).toFixed(1)} • ${(d.balance || 0).toLocaleString('vi-VN')}đ</p></div></div>`).join('') || '<div style="color:var(--text-sec);font-size:13px">Chưa có dữ liệu</div>'}`;
+}
+const _ra = renderAll; renderAll = function () { _ra(); renderExtra(); };
+
+// Realtime: dữ liệu đổi từ máy khách / tài xế → admin tự cập nhật
+const refreshAdmin = debounce(() => {
+  if (document.getElementById('appView').style.display !== 'flex') return;
+  renderAll();
+  const t = currentAdminTab();
+  if (t === 'users') renderMembers();
+  if (t === 'approvals') renderApprovals();
+  if (t === 'marketing') renderMarketing();
+}, 150);
+onDBChange(type => { if (type === 'change') refreshAdmin(); });
+dbReady.then(() => { if (Sess.get('admin')) enterAdmin(); });
+onDBChange((t, e) => { if (t === 'error' && window.__showErr) window.__showErr('Firebase: ' + ((e && e.message) || e)); });
+</script>
+</body>
+</html>
